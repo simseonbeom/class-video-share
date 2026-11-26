@@ -82,8 +82,13 @@
   .card.new{animation:arrive .5s var(--ease)}
   @keyframes arrive{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
   .thumb{aspect-ratio:4/3;background:#e2e0da;position:relative;overflow:hidden}
-  .thumb video{width:100%;height:100%;object-fit:cover;display:block;transition:transform .6s var(--ease)}
-  .card:hover .thumb video{transform:scale(1.015)}
+  .thumb img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .6s var(--ease)}
+  .card:hover .thumb img{transform:scale(1.015)}
+  .thumb .noimg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:13px}
+  .thumb .play{position:absolute;right:10px;bottom:10px;width:30px;height:30px;border-radius:50%;background:rgba(21,21,21,.55);display:flex;align-items:center;justify-content:center;
+    opacity:0;transition:opacity .18s ease}
+  .card:hover .thumb .play{opacity:1}
+  @media (hover:none){ .thumb .play{opacity:1} }
   .viewers{position:absolute;left:10px;bottom:10px;display:flex}
   .viewers .av{width:24px;height:24px;font-size:11px;border-color:rgba(255,255,255,.9);margin-left:-6px}
   .viewers .av:first-child{margin-left:0}
@@ -312,7 +317,7 @@ function armOrRun(btn, armedLabel, run){
 async function deletePost(p){
   const { error } = await sb.from("posts").delete().eq("id", p.id);
   if(error) return toast("삭제 실패: "+error.message);
-  await sb.storage.from("videos").remove([p.video_path]);
+  await sb.storage.from("videos").remove([p.video_path, ...(p.thumb_url ? [p.video_path.replace(/\.[^.]+$/, "") + ".jpg"] : [])]);
   posts = posts.filter(x=>x.id!==p.id); render();
   if(openPost?.id===p.id) closeDetail();
   toast("삭제했습니다");
@@ -367,13 +372,14 @@ function cardHTML(p){
   const tools = (p.tools||"").split(",").map(s=>s.trim()).filter(Boolean);
   const n = counts[p.id]||0;
   return `<article class="card" data-id="${p.id}">
-    <div class="thumb"><video src="${esc(p.video_url)}#t=0.5" muted playsinline preload="metadata"></video>
+    <div class="thumb">${p.thumb_url?`<img src="${esc(p.thumb_url)}" alt="" loading="lazy" decoding="async">`:`<div class="noimg">눌러서 영상 보기</div>`}
+      <span class="play"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M3 1.5v9l7.5-4.5z" fill="#fff"/></svg></span>
       <div class="viewers" data-v="${p.id}"></div></div>
     <div class="cap">
       <span class="no">${workNo(p)}</span>
       <h3>${esc(p.title)}</h3>
       ${canDelete(p)?`<button class="del">삭제</button>`:"<span></span>"}
-      <div class="by">${esc(p.nickname)} <i>· ${ago(p.created_at)}<span class="badge">${n?` · ${critLabel(n)}`:""}</span></i></div>
+      <div class="by">${esc(p.nickname)} <i>· <span class="ago" data-ts="${p.created_at}">${ago(p.created_at)}</span><span class="badge">${n?` · ${critLabel(n)}`:""}</span></i></div>
       ${tools.length?`<div class="tl">${tools.map(esc).join(", ")}</div>`:""}
     </div></article>`;
 }
@@ -385,9 +391,6 @@ function render(newId){
   g.innerHTML = list.map(cardHTML).join("");
   g.querySelectorAll(".card").forEach(c=>{
     if(c.dataset.id===newId) c.classList.add("new");
-    const v = c.querySelector("video");
-    c.onmouseenter = ()=>{ v.play().catch(()=>{}); };
-    c.onmouseleave = ()=>{ v.pause(); };
     c.onclick = ()=>openDetail(c.dataset.id);
     const d = c.querySelector(".del");
     if(d) d.onclick = e=>{ e.stopPropagation(); const p = posts.find(x=>x.id===c.dataset.id); if(p) armOrRun(d, "정말 삭제", ()=>deletePost(p)); };
@@ -439,19 +442,39 @@ function pick(f){
   if(!f.type.startsWith("video/")){ $("#upErr").textContent="영상 파일만 올릴 수 있어요"; return; }
   if(f.size > MAX_BYTES){ $("#upErr").textContent=`${(f.size/1048576).toFixed(1)}MB라서 올릴 수 없어요. 1080p로 다시 내보내면 대개 50MB 아래로 줄어듭니다.`; return; }
   pickedFile = f;
+  thumbJob = makeThumb(f);
   drop.classList.add("has");
   drop.innerHTML = `<b>${esc(f.name)}</b> · ${(f.size/1048576).toFixed(1)}MB<br><video src="${URL.createObjectURL(f)}" muted autoplay loop playsinline></video><div class="hint">다른 파일로 바꾸려면 한 번 더 누르세요</div>`;
   drop.appendChild(fileIn);
   if(!$("#fTitle").value) $("#fTitle").value = f.name.replace(/\.[^.]+$/,"");
 }
 function resetUpload(){
-  pickedFile=null; fileIn.value=""; drop.classList.remove("has");
+  pickedFile=null; thumbJob=null; fileIn.value=""; drop.classList.remove("has");
   drop.innerHTML="눌러서 고르거나 여기로 끌어다 놓으세요"; drop.appendChild(fileIn);
   ["#fTitle","#fTools","#fPrompt","#fHow"].forEach(s=>$(s).value="");
   $("#upErr").textContent=""; $("#prog").style.display="none"; $("#prog div").style.width="0";
 }
 $("#uploadBtn").onclick = ()=>{ if(!me.nick) return askNick(); show("#upModal"); };
 
+// 고른 영상(내 컴퓨터 파일)에서 한 장면을 잘라 작은 jpg로 만든다. 네트워크는 쓰지 않음
+function makeThumb(file){
+  return new Promise(res=>{
+    const v = document.createElement("video"), url = URL.createObjectURL(file);
+    let done = false;
+    const finish = b=>{ if(done) return; done = true; URL.revokeObjectURL(url); v.removeAttribute("src"); v.load(); res(b); };
+    v.muted = true; v.playsInline = true; v.preload = "auto"; v.src = url;
+    v.onloadeddata = ()=>{ v.currentTime = Math.min(1, (v.duration||2) * 0.2); };
+    v.onseeked = ()=>{
+      const W = 720, vw = v.videoWidth || 1280, vh = v.videoHeight || 720;
+      const w = Math.min(W, vw), h = Math.round(w * vh / vw);
+      const c = document.createElement("canvas"); c.width = w; c.height = h;
+      try{ c.getContext("2d").drawImage(v, 0, 0, w, h); c.toBlob(b=>finish(b), "image/jpeg", 0.72); }catch(e){ finish(null); }
+    };
+    v.onerror = ()=>finish(null);
+    setTimeout(()=>finish(null), 8000);
+  });
+}
+let thumbJob = null;
 function uploadWithProgress(path, file, onProgress){
   // supabase-js 업로드는 진행률이 없어 XHR로 직접 올림
   return new Promise((resolve,reject)=>{
@@ -461,6 +484,7 @@ function uploadWithProgress(path, file, onProgress){
     xhr.setRequestHeader("apikey", SUPABASE_ANON_KEY);
     xhr.setRequestHeader("Content-Type", file.type || "video/mp4");
     xhr.setRequestHeader("x-upsert", "false");
+    xhr.setRequestHeader("cache-control", "max-age=604800");   // 브라우저가 일주일 동안 다시 받지 않게
     xhr.upload.onprogress = e=>{ if(e.lengthComputable) onProgress(e.loaded/e.total); };
     xhr.onload = ()=> xhr.status<300 ? resolve() : reject(new Error((()=>{ try{return JSON.parse(xhr.responseText).message}catch(e){return xhr.statusText} })()));
     xhr.onerror = ()=>reject(new Error("네트워크 오류"));
@@ -476,12 +500,19 @@ $("#upSubmit").onclick = async ()=>{
   try{
     const ext = (pickedFile.name.split(".").pop()||"mp4").toLowerCase().replace(/[^a-z0-9]/g,"") || "mp4";
     const path = `${Date.now()}-${Math.random().toString(36).slice(2,8)}.${ext}`;
-    await uploadWithProgress(path, pickedFile, r=>$("#prog div").style.width=(r*100).toFixed(0)+"%");
+    await uploadWithProgress(path, pickedFile, r=>$("#prog div").style.width=(r*95).toFixed(0)+"%");
     const { data:{ publicUrl } } = sb.storage.from("videos").getPublicUrl(path);
+    let thumb_url = null;
+    const thumb = thumbJob ? await thumbJob : null;
+    if(thumb){
+      const tpath = path.replace(/\.[^.]+$/, "") + ".jpg";
+      try{ await uploadWithProgress(tpath, thumb, ()=>{}); thumb_url = sb.storage.from("videos").getPublicUrl(tpath).data.publicUrl; }catch(e){}
+    }
+    $("#prog div").style.width = "100%";
     const { error } = await sb.from("posts").insert({
       author_id: me.id, nickname: me.nick, title,
       tools: $("#fTools").value.trim(), prompt: $("#fPrompt").value.trim(), how_made: $("#fHow").value.trim(),
-      video_path: path, video_url: publicUrl
+      video_path: path, video_url: publicUrl, thumb_url
     });
     if(error) throw error;
     hide("#upModal"); resetUpload(); toast("올렸습니다");
@@ -494,6 +525,7 @@ $("#upSubmit").onclick = async ()=>{
 async function openDetail(id){
   const p = posts.find(x=>x.id===id); if(!p) return;
   openPost = p;
+  $("#dVideo").poster = p.thumb_url || "";
   $("#dVideo").src = p.video_url;
   $("#dVideo").play().catch(()=>{});
   const tools = (p.tools||"").split(",").map(s=>s.trim()).filter(Boolean);
@@ -563,7 +595,7 @@ sb.channel("class-room")
     $("#live span").textContent = on ? "실시간 연결됨" : "연결 중"; $("#live").title = on ? "실시간 연결됨" : "연결 중";
   });
 function updateBadge(pid){ const b=document.querySelector(`.card[data-id="${pid}"] .badge`); if(b) b.textContent = counts[pid] ? ` · ${critLabel(counts[pid])}` : ""; paintStats(); }
-setInterval(()=>document.querySelectorAll(".card").length && render(), 60000);
+setInterval(()=>document.querySelectorAll(".ago").forEach(el=>el.textContent = ago(el.dataset.ts)), 60000);
 
 /* 접속자 + 실시간 커서 (Supabase Realtime Presence / Broadcast) */
 const PALETTE = ["#f2a48f","#f0c27b","#e6d96b","#a9cf8a","#86cfc4","#8fb8e8","#b2a7e6","#e1a6cf","#d9b99b","#9fd0e6"];
