@@ -144,6 +144,19 @@
   .cmt .who small{font-weight:400;color:var(--muted);margin-left:6px}
   .cmt .body{font-size:14px;margin-top:3px;white-space:pre-wrap;word-break:break-word;line-height:1.55}
   .cmt .del{float:right}
+  /* 삭제 */
+  .delbtn{position:absolute;right:8px;top:8px;height:28px;min-width:28px;padding:0 8px;border-radius:4px;border:1px solid rgba(255,255,255,.14);
+    background:rgba(0,0,0,.62);color:#ddd;display:flex;align-items:center;justify-content:center;gap:6px;font-size:12px;font-weight:600;
+    opacity:0;transform:translateY(-2px);transition:opacity .18s ease,transform .18s ease,background .18s ease}
+  .card:hover .delbtn,.delbtn.armed{opacity:1;transform:none}
+  .delbtn:hover{background:rgba(0,0,0,.8);color:#fff}
+  .delbtn.armed{background:var(--danger);border-color:var(--danger);color:#1a0606}
+  .delbtn svg{width:14px;height:14px}
+  .btn.danger{border-color:rgba(255,107,107,.45);color:var(--danger);background:transparent;padding:6px 11px;font-size:13px}
+  .btn.danger:hover{background:rgba(255,107,107,.1)}
+  .btn.danger.armed{background:var(--danger);color:#1a0606;border-color:var(--danger)}
+  .teacher{font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;color:var(--accent);border:1px solid var(--accent);border-radius:3px;padding:2px 6px}
+  @media (hover:none){ .delbtn{opacity:1;transform:none} }
   .cform{display:flex;gap:8px;padding:12px 16px;border-top:1px solid var(--line)}
   .cform input{flex:1}
   .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);background:#1f2023;border:1px solid var(--line2);padding:10px 16px;border-radius:6px;font-size:14px;opacity:0;transition:.25s;z-index:100;pointer-events:none}
@@ -281,6 +294,32 @@ function store(k, v){ try{ if(v===undefined) return localStorage.getItem(k); loc
 let me = { id: store("cvs_id"), nick: store("cvs_nick") };
 if(!me.id){ me.id = (crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2)); store("cvs_id", me.id); }
 
+/* 교수자 모드: 주소 끝에 ?teacher=khu2026 을 붙여 한 번 열면 이 브라우저에서 모든 작품·크리틱을 지울 수 있음 (?teacher=off 로 해제) */
+(()=>{ const q = new URLSearchParams(location.search).get("teacher");
+  if(q==="khu2026") store("cvs_teacher","1"); else if(q==="off") store("cvs_teacher","0");
+  if(q!==null) history.replaceState(null,"",location.pathname); })();
+const isTeacher = store("cvs_teacher")==="1";
+const canDelete = x => isTeacher || x.author_id===me.id;
+const TRASH = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6"/></svg>`;
+
+// 두 번 눌러 확인하는 버튼: 첫 클릭에 '삭제?'로 바뀌고 3초 안에 다시 누르면 실행
+function armOrRun(btn, armedLabel, run){
+  if(!btn.classList.contains("armed")){
+    btn.classList.add("armed"); btn._orig = btn.innerHTML; btn.innerHTML = armedLabel;
+    clearTimeout(btn._t); btn._t = setTimeout(()=>{ btn.classList.remove("armed"); btn.innerHTML = btn._orig; }, 3000);
+    return;
+  }
+  clearTimeout(btn._t); btn.disabled = true; run();
+}
+async function deletePost(p){
+  const { error } = await sb.from("posts").delete().eq("id", p.id);
+  if(error) return toast("삭제 실패: "+error.message);
+  await sb.storage.from("videos").remove([p.video_path]);
+  posts = posts.filter(x=>x.id!==p.id); render();
+  if(openPost?.id===p.id) closeDetail();
+  toast("작품을 삭제했어요");
+}
+
 let posts = [];
 let counts = {};          // post_id -> comment count
 let filterNick = null;
@@ -299,7 +338,7 @@ document.querySelectorAll(".overlay").forEach(o=>o.addEventListener("mousedown",
 document.addEventListener("keydown",e=>{ if(e.key==="Escape"){ if($("#detailModal").classList.contains("show")) closeDetail(); hide("#upModal"); } });
 
 /* 닉네임 */
-function renderMe(){ $("#me").innerHTML = me.nick ? `<b>${esc(me.nick)}</b>` : ""; }
+function renderMe(){ $("#me").innerHTML = (isTeacher?`<span class="teacher">TEACHER</span> `:"") + (me.nick ? `<b>${esc(me.nick)}</b>` : ""); }
 function askNick(){ $("#nickInput").value = me.nick || ""; show("#nickModal"); setTimeout(()=>$("#nickInput").focus(),50); }
 $("#nickSave").onclick = () => {
   const v = $("#nickInput").value.trim();
@@ -329,6 +368,7 @@ function cardHTML(p){
   return `<article class="card" data-id="${p.id}">
     <div class="thumb"><video src="${esc(p.video_url)}#t=0.5" muted playsinline preload="metadata"></video>
       <div class="viewers" data-v="${p.id}"></div>
+      ${canDelete(p)?`<button class="delbtn" title="작품 삭제" aria-label="작품 삭제">${TRASH}</button>`:""}
       <span class="badge">CRIT ${counts[p.id]||0}</span></div>
     <div class="meta"><div class="no">${workNo(p)}</div><h3>${esc(p.title)}</h3>
       <div class="sub"><span>${esc(p.nickname)}</span><span>·</span><span>${ago(p.created_at)}</span></div>
@@ -347,6 +387,8 @@ function render(newId){
     c.onmouseenter = ()=>{ v.play().catch(()=>{}); };
     c.onmouseleave = ()=>{ v.pause(); };
     c.onclick = ()=>openDetail(c.dataset.id);
+    const d = c.querySelector(".delbtn");
+    if(d) d.onclick = e=>{ e.stopPropagation(); const p = posts.find(x=>x.id===c.dataset.id); if(p) armOrRun(d, `${TRASH}삭제?`, ()=>deletePost(p)); };
   });
   paintViewers();
 }
@@ -458,19 +500,13 @@ async function openDetail(id){
     <h2>${esc(p.title)}</h2>
     <div class="sub" style="display:flex;gap:8px;color:var(--muted);font-size:13px;align-items:center">
       <span>${esc(p.nickname)}</span><span>·</span><span>${ago(p.created_at)}</span>
-      ${p.author_id===me.id?`<span style="flex:1"></span><button class="btn ghost" id="delPost" style="color:var(--danger)">삭제</button>`:""}
+      ${canDelete(p)?`<span style="flex:1"></span><button class="btn danger" id="delPost">작품 삭제</button>`:""}
     </div>
     ${tools.length?`<div class="sec"><h4>AI TOOLS</h4><div class="tools" style="margin:0">${tools.map(t=>`<span class="tool">${esc(t)}</span>`).join("")}</div></div>`:""}
     ${p.prompt?`<div class="sec"><h4>PROMPT</h4><pre>${esc(p.prompt)}</pre></div>`:""}
     ${p.how_made?`<div class="sec"><h4>DESIGN PROCESS</h4><div class="text">${esc(p.how_made)}</div></div>`:""}`;
   const del = $("#delPost");
-  if(del) del.onclick = async ()=>{
-    if(del.dataset.armed!=="1"){ del.dataset.armed="1"; del.textContent="한 번 더 누르면 삭제"; return; }
-    await sb.storage.from("videos").remove([p.video_path]);
-    const { error } = await sb.from("posts").delete().eq("id", p.id);
-    if(error) return toast("삭제 실패: "+error.message);
-    closeDetail(); toast("삭제했어요");
-  };
+  if(del) del.onclick = ()=>armOrRun(del, "한 번 더 누르면 삭제", ()=>deletePost(p));
   $("#dComments").innerHTML = `<div class="hint">크리틱 불러오는 중…</div>`;
   show("#detailModal");
   trackMe();
@@ -484,7 +520,7 @@ function renderComments(list){
   const box = $("#dComments");
   if(!list.length){ box.innerHTML = `<div class="hint">아직 크리틱이 없어요. 첫 의견을 남겨 주세요.</div>`; return; }
   box.innerHTML = list.map(c=>`<div class="cmt">
-      ${c.author_id===me.id?`<button class="btn ghost del" data-id="${c.id}">삭제</button>`:""}
+      ${canDelete(c)?`<button class="btn ghost del" data-id="${c.id}">삭제</button>`:""}
       <div class="who">${esc(c.nickname)}<small>${ago(c.created_at)}</small></div>
       <div class="body">${esc(c.body)}</div></div>`).join("");
   box.querySelectorAll(".del").forEach(b=>b.onclick=()=>sb.from("comments").delete().eq("id",b.dataset.id));
