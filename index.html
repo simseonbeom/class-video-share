@@ -3,234 +3,232 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>KHU ID × AI Studio</title>
+<title>AI 제품 영상 크리틱</title>
 <link rel="preconnect" href="https://cdn.jsdelivr.net">
 <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css" rel="stylesheet">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
   :root{
-    --bg:#0d0e0f; --panel:#151618; --panel2:#1c1d20; --line:#2a2b2f; --line2:#3a3b40;
-    --text:#ecebe8; --muted:#8e8f94; --accent:#ff5b1f; --accent-soft:rgba(255,91,31,.12); --danger:#ff6b6b;
-    --radius:6px;
-    --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+    --paper:#f3f2ee; --sheet:#fbfaf8; --ink:#151515; --ink2:#3b3a37; --muted:#77756f; --line:#dad8d1; --line2:#c9c6bd;
+    --danger:#c2341f;
+    --ease:cubic-bezier(.22,.8,.24,1);
   }
   *{box-sizing:border-box}
-  html,body{margin:0;background:var(--bg);color:var(--text);
-    font-family:"Pretendard Variable",Pretendard,-apple-system,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
-  body{background-image:radial-gradient(rgba(255,255,255,.055) 1px,transparent 1px);background-size:24px 24px;background-attachment:fixed}
+  html,body{margin:0;background:var(--paper);color:var(--ink);
+    font-family:"Pretendard Variable",Pretendard,-apple-system,system-ui,sans-serif;font-size:15px;line-height:1.55;
+    -webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums;word-break:keep-all;overflow-wrap:break-word}
   button,input,textarea{font:inherit;color:inherit}
-  button{cursor:pointer}
-  .mono{font-family:var(--mono)}
-  .wrap{max-width:1240px;margin:0 auto;padding:0 24px}
-  header{position:sticky;top:0;z-index:10;background:rgba(13,14,15,.86);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
-  header .wrap{display:flex;align-items:center;gap:14px;height:60px}
-  .logo{display:flex;align-items:center;gap:10px;white-space:nowrap}
-  .logo .mark{width:22px;height:22px;background:var(--accent);border-radius:3px;position:relative}
-  .logo .mark::after{content:"";position:absolute;inset:6px;border:2px solid var(--bg);border-radius:50%}
-  .logo b{font-family:var(--mono);font-weight:700;font-size:14px;letter-spacing:.02em}
-  .logo small{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.06em;padding-left:10px;border-left:1px solid var(--line2)}
-  .live{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.04em}
-  .live i{width:6px;height:6px;border-radius:50%;background:#555}
-  .live.on i{background:#3ddc84;box-shadow:0 0 0 3px rgba(61,220,132,.16)}
+  button{cursor:pointer;background:none;border:0;padding:0}
+  .wrap{max-width:1280px;margin:0 auto;padding:0 32px}
+
+  /* 상단 바: 종이 위에 떠 있는 반투명 층, 스크롤하면 아래 경계만 살짝 */
+  header{position:sticky;top:0;z-index:10;background:rgba(243,242,238,.82);backdrop-filter:blur(14px) saturate(160%);-webkit-backdrop-filter:blur(14px) saturate(160%);transition:box-shadow .2s ease}
+  header.scrolled{box-shadow:0 1px 0 var(--line)}
+  header .wrap{display:flex;align-items:center;gap:20px;height:60px}
+  .brand{font-weight:700;font-size:15px;letter-spacing:-.01em;white-space:nowrap}
+  .brand span{font-weight:400;color:var(--muted);margin-left:8px}
   .spacer{flex:1}
-  /* 접속자(프레즌스) */
-  .people{display:flex;align-items:center;gap:10px;position:relative}
+
+  .live{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--line2);flex:none}
+  .live.on{background:#2f9e5b}
+  .live span{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+  .people{display:flex;align-items:center;gap:10px;position:relative;font-size:13px;color:var(--ink2)}
   .avatars{display:flex;flex-direction:row-reverse}
-  .av{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#0b0c10;
-    border:2px solid var(--bg);margin-left:-7px;position:relative;cursor:default;transition:transform .2s ease;animation:avIn .35s ease}
-  .av:hover{transform:translateY(-2px);z-index:2}
-  .av.more{background:var(--panel2);color:var(--muted);border-color:var(--bg)}
-  .av.self{box-shadow:0 0 0 2px var(--text) inset}
-  @keyframes avIn{from{opacity:0;transform:scale(.6)}to{opacity:1;transform:none}}
-  .people .count{font-family:var(--mono);font-size:11.5px;color:var(--muted);white-space:nowrap}
-  .plist{position:absolute;top:40px;right:0;min-width:240px;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:6px;
-    box-shadow:0 12px 30px rgba(0,0,0,.45);opacity:0;pointer-events:none;transform:translateY(-4px);transition:.18s ease;z-index:20}
-  .plist::before{content:"IN STUDIO";display:block;font-family:var(--mono);font-size:10.5px;color:var(--muted);letter-spacing:.1em;padding:6px 8px 4px}
+  .av{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11.5px;font-weight:600;color:#1a1a1a;
+    border:2px solid var(--paper);margin-left:-7px;cursor:default;transition:transform .2s var(--ease)}
+  .av:hover{transform:translateY(-2px)}
+  .av.more{background:#e4e2dc;color:var(--muted)}
+  .av.self{outline:1.5px solid var(--ink);outline-offset:-1.5px}
+  .count{white-space:nowrap}
+  .plist{position:absolute;top:38px;right:0;min-width:230px;background:var(--sheet);border:1px solid var(--line);border-radius:10px;padding:6px;
+    box-shadow:0 18px 40px -12px rgba(30,25,15,.22);opacity:0;pointer-events:none;transform:translateY(-4px);transition:opacity .16s ease,transform .2s var(--ease);z-index:20}
   .people:hover .plist{opacity:1;pointer-events:auto;transform:none}
-  .prow{display:flex;align-items:center;gap:10px;padding:7px 8px;border-radius:6px;font-size:13.5px}
-  .prow .dot{width:9px;height:9px;border-radius:50%;flex:none}
-  .prow small{display:block;color:var(--muted);font-size:12px;margin-top:1px}
-  .viewers{position:absolute;left:8px;top:8px;display:flex}
-  .viewers .av{width:24px;height:24px;font-size:11px;margin-left:-6px;border-width:2px}
+  .prow{display:flex;align-items:flex-start;gap:10px;padding:7px 8px;font-size:13.5px;color:var(--ink)}
+  .prow .dot{width:8px;height:8px;border-radius:50%;flex:none;margin-top:6px}
+  .prow small{display:block;color:var(--muted);font-size:12.5px}
+
+  .me{font-size:13px;color:var(--ink2);white-space:nowrap}
+  .me .admin{color:var(--muted);margin-right:6px}
+  .linkbtn{font-size:13px;color:var(--muted);white-space:nowrap}
+  .linkbtn:hover{color:var(--ink)}
+
+  .btn{display:inline-flex;align-items:center;justify-content:center;height:38px;padding:0 16px;border-radius:999px;font-weight:600;font-size:14px;
+    white-space:nowrap;transition:transform .12s ease,background .15s ease}
+  .btn:active{transform:scale(.97)}
+  .btn.primary{background:var(--ink);color:var(--paper)}
+  .btn.primary:hover{background:#000}
+  .btn.line{border:1px solid var(--line2);color:var(--ink)}
+  .btn.line:hover{border-color:var(--ink)}
+  .btn:disabled{opacity:.45;cursor:not-allowed;transform:none}
+
+  /* 머리말 */
+  .intro{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:48px;align-items:end;padding:72px 0 36px}
+  .intro h1{margin:0;font-size:clamp(40px,6.2vw,84px);line-height:1.02;letter-spacing:-.045em;font-weight:700}
+  .intro .side{color:var(--ink2);font-size:14.5px;line-height:1.7;padding-bottom:8px}
+  .intro .side .course{color:var(--ink);font-weight:600;margin-bottom:14px;line-height:1.5}
+  .intro .side .course span{display:block;font-weight:400;color:var(--muted)}
+  .intro .side p{margin:0}
+
+  .bar{display:flex;align-items:baseline;gap:24px;border-top:1px solid var(--ink);padding:12px 0 0}
+  .filters{display:flex;gap:4px 18px;flex-wrap:wrap;flex:1}
+  .chip{font-size:14px;color:var(--muted);padding:2px 0;border-bottom:1.5px solid transparent;transition:color .15s ease}
+  .chip:hover{color:var(--ink)}
+  .chip.active{color:var(--ink);border-bottom-color:var(--ink)}
+  .chip sup{font-size:10.5px;margin-left:2px;vertical-align:4px}
+  .totals{font-size:13px;color:var(--muted);white-space:nowrap}
+
+  /* 작품 목록 */
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:44px 28px;padding:28px 0 120px}
+  .card{cursor:pointer}
+  .card.new{animation:arrive .5s var(--ease)}
+  @keyframes arrive{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+  .thumb{aspect-ratio:4/3;background:#e2e0da;position:relative;overflow:hidden}
+  .thumb video{width:100%;height:100%;object-fit:cover;display:block;transition:transform .6s var(--ease)}
+  .card:hover .thumb video{transform:scale(1.015)}
+  .viewers{position:absolute;left:10px;bottom:10px;display:flex}
+  .viewers .av{width:24px;height:24px;font-size:11px;border-color:rgba(255,255,255,.9);margin-left:-6px}
   .viewers .av:first-child{margin-left:0}
+  .cap{display:grid;grid-template-columns:30px 1fr auto;gap:0 8px;padding-top:12px}
+  .cap .no{font-size:13px;color:var(--muted);padding-top:1px}
+  .cap h3{margin:0;font-size:16px;font-weight:600;line-height:1.4;letter-spacing:-.01em;word-break:keep-all;overflow-wrap:anywhere}
+  .card:hover .cap h3{text-decoration:underline;text-underline-offset:3px;text-decoration-thickness:1px}
+  .cap .by{grid-column:2;font-size:13.5px;color:var(--ink2);margin-top:2px}
+  .cap .by i{font-style:normal;color:var(--muted)}
+  .cap .tl{grid-column:2;font-size:13px;color:var(--muted);margin-top:2px}
+  .del{font-size:12.5px;color:var(--muted);height:22px;transition:color .15s ease}
+  .del:hover{color:var(--danger)}
+  .del.armed{color:var(--danger);font-weight:600}
+  .empty{grid-column:1/-1;color:var(--muted);padding:80px 0;font-size:15px}
+
+  /* 시트(모달) */
+  .overlay{position:fixed;inset:0;background:rgba(28,26,22,.42);display:flex;align-items:center;justify-content:center;padding:24px;z-index:50;
+    opacity:0;visibility:hidden;transition:opacity .2s ease,visibility 0s linear .2s}
+  .overlay.show{opacity:1;visibility:visible;transition:opacity .2s ease}
+  .modal{background:var(--sheet);border-radius:14px;width:100%;max-width:520px;max-height:92vh;overflow:auto;
+    box-shadow:0 30px 80px -20px rgba(20,15,5,.35);transform:translateY(12px) scale(.985);transition:transform .32s var(--ease)}
+  .overlay.show .modal{transform:none}
+  .modal.wide{max-width:1180px;overflow:hidden}
+  .modal-head{display:flex;align-items:center;padding:22px 24px 6px}
+  .modal-head h2{margin:0;font-size:20px;letter-spacing:-.02em}
+  .x{width:32px;height:32px;border-radius:50%;color:var(--muted);font-size:18px;line-height:1}
+  .x:hover{background:#ebe9e3;color:var(--ink)}
+  .modal-body{padding:12px 24px 24px}
+  .modal-body .lead{margin:0 0 4px;color:var(--muted);font-size:14px}
+  label{display:block;font-size:13.5px;font-weight:600;margin:18px 0 6px}
+  label small{font-weight:400;color:var(--muted);margin-left:6px}
+  input[type=text],textarea{width:100%;background:#fff;border:1px solid var(--line);border-radius:8px;padding:10px 12px;outline:none;transition:border-color .15s ease}
+  input[type=text]:focus,textarea:focus{border-color:var(--ink)}
+  ::placeholder{color:#a9a69e}
+  textarea{resize:vertical;min-height:88px;line-height:1.55}
+  .drop{border:1px dashed var(--line2);border-radius:8px;padding:22px;text-align:center;color:var(--muted);cursor:pointer;background:#fff;font-size:14px;transition:border-color .15s ease}
+  .drop:hover{border-color:var(--ink2)}
+  .drop.has{border-style:solid;border-color:var(--ink);color:var(--ink)}
+  .drop video{max-width:100%;max-height:200px;margin-top:10px;display:block;margin-inline:auto}
+  .hint{font-size:12.5px;color:var(--muted);margin-top:6px}
+  .err{color:var(--danger);font-size:13px;margin-top:12px;min-height:1em}
+  .actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
+
+  .detail{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(320px,1fr);height:min(720px,88vh)}
+  .detail .left{background:#111;display:flex;align-items:center;justify-content:center;min-height:0}
+  .detail .left video{width:100%;max-height:100%;display:block}
+  .detail .right{display:flex;flex-direction:column;min-height:0;position:relative}
+  .detail .right .x{position:absolute;right:12px;top:12px}
+  .detail .info{padding:26px 28px 18px;overflow:auto;flex:0 1 auto;max-height:58%}
+  .detail .info .no{font-size:13px;color:var(--muted)}
+  .detail .info h2{margin:2px 36px 6px 0;font-size:24px;line-height:1.3;letter-spacing:-.025em;word-break:keep-all}
+  .detail .info .by{display:flex;gap:12px;align-items:baseline;font-size:14px;color:var(--ink2)}
+  .detail .info .by i{font-style:normal;color:var(--muted)}
+  .sec{margin-top:20px}
+  .sec h4{margin:0 0 6px;font-size:13px;font-weight:600;color:var(--ink)}
+  .sec .text{white-space:pre-wrap;font-size:14.5px;line-height:1.7;color:var(--ink2)}
+  .sec pre{margin:0;white-space:pre-wrap;word-break:break-word;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;line-height:1.7;
+    background:var(--paper);border-radius:6px;padding:12px 14px;color:var(--ink2)}
+  .chead{display:flex;align-items:baseline;gap:6px;font-size:13px;font-weight:600;padding:14px 28px 4px;border-top:1px solid var(--line)}
+  .chead span{font-weight:400;color:var(--muted)}
+  .comments{flex:1;overflow:auto;padding:0 28px 12px;min-height:120px}
+  .cmt{padding:11px 0;border-bottom:1px solid #ebe9e3}
+  .cmt:last-child{border-bottom:0}
+  .cmt .who{font-size:13.5px;font-weight:600;display:flex;gap:8px;align-items:baseline}
+  .cmt .who small{font-weight:400;color:var(--muted);font-size:12.5px}
+  .cmt .who .del{margin-left:auto;height:auto}
+  .cmt .body{font-size:14.5px;margin-top:2px;white-space:pre-wrap;word-break:break-word;line-height:1.6;color:var(--ink2)}
+  .cform{display:flex;gap:8px;padding:12px 16px 16px 28px;border-top:1px solid var(--line)}
+  .cform input{flex:1;border-radius:999px;padding:9px 16px}
+
+  .toast{position:fixed;left:50%;bottom:28px;transform:translate(-50%,12px);background:var(--ink);color:var(--paper);padding:10px 18px;border-radius:999px;font-size:14px;
+    opacity:0;transition:opacity .2s ease,transform .3s var(--ease);z-index:100;pointer-events:none}
+  .toast.show{opacity:1;transform:translate(-50%,0)}
+  .progress{height:3px;background:var(--line);overflow:hidden;margin-top:14px;display:none;border-radius:2px}
+  .progress div{height:100%;width:0;background:var(--ink);transition:width .2s linear}
+
+  .pagedrop{position:fixed;inset:0;z-index:80;background:rgba(243,242,238,.9);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);
+    display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .18s ease}
+  .pagedrop::before{content:"";position:absolute;inset:16px;border:1.5px dashed var(--ink);border-radius:16px}
+  .pagedrop.show{opacity:1}
+  .pagedrop div{text-align:center;transform:translateY(6px);transition:transform .3s var(--ease)}
+  .pagedrop.show div{transform:none}
+  .pagedrop b{display:block;font-size:30px;letter-spacing:-.03em}
+  .pagedrop span{color:var(--muted)}
+
   /* 실시간 커서 */
   #cursors{position:absolute;left:0;top:0;width:0;height:0;z-index:90;pointer-events:none}
   .cursor{position:absolute;left:0;top:0;transition:transform .22s linear,opacity .3s ease;will-change:transform}
-  .cursor svg{display:block;filter:drop-shadow(0 1px 2px rgba(0,0,0,.5))}
-  .cursor .tag{position:absolute;left:14px;top:16px;padding:3px 8px;border-radius:4px 4px 4px 1px;font-size:12px;font-weight:700;color:#0b0c10;white-space:nowrap}
+  .cursor svg{display:block}
+  .cursor .tag{position:absolute;left:14px;top:17px;padding:2px 8px;border-radius:6px;font-size:12px;font-weight:600;color:#1a1a1a;white-space:nowrap}
   .cursor.idle{opacity:0}
-  .me{font-size:13px;color:var(--muted);white-space:nowrap}
-  .me b{color:var(--text)}
-  .btn{border-radius:var(--radius);padding:9px 15px;font-weight:600;font-size:14px;background:var(--panel2);border:1px solid var(--line);white-space:nowrap}
-  .btn:hover{background:#25262a}
-  .btn.primary{background:var(--accent);border-color:var(--accent);color:#120804}
-  .btn.primary:hover{filter:brightness(1.08)}
-  .btn:disabled{opacity:.5;cursor:not-allowed}
-  .btn.ghost{background:none;border:0;color:var(--muted);padding:6px 8px}
-  .btn.ghost:hover{color:var(--text)}
 
-  .hero{padding:52px 0 26px;display:grid;grid-template-columns:1fr auto;gap:32px;align-items:end;border-bottom:1px solid var(--line)}
-  .eyebrow{font-family:var(--mono);font-size:11.5px;letter-spacing:.12em;color:var(--accent);margin-bottom:14px}
-  .hero h1{margin:0 0 12px;font-size:40px;line-height:1.18;letter-spacing:-.035em;font-weight:800}
-  .hero h1 em{font-style:normal;color:var(--accent)}
-  .hero p{margin:0;color:var(--muted);font-size:15px;line-height:1.7;max-width:640px}
-  .stats{display:flex;border:1px solid var(--line);border-radius:var(--radius);background:var(--panel)}
-  .stat{padding:14px 20px;min-width:110px}
-  .stat+.stat{border-left:1px solid var(--line)}
-  .stat small{display:block;font-family:var(--mono);font-size:10.5px;color:var(--muted);letter-spacing:.1em}
-  .stat b{display:block;font-family:var(--mono);font-size:28px;font-weight:500;margin-top:4px}
-  .toolbar{display:flex;align-items:center;gap:12px;padding:18px 0 0}
-  .toolbar .lbl{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.1em}
-  .filters{display:flex;gap:6px;flex-wrap:wrap}
-  .chip{padding:6px 11px;border-radius:4px;background:transparent;border:1px solid var(--line);font-size:13px;color:var(--muted)}
-  .chip:hover{color:var(--text)}
-  .chip.active{color:var(--text);border-color:var(--accent);background:var(--accent-soft)}
-
-  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:20px;padding:20px 0 90px}
-  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;cursor:pointer;transition:transform .2s ease,border-color .2s ease}
-  .card:hover{transform:translateY(-2px);border-color:var(--line2)}
-  .card.new{animation:pop .5s ease}
-  @keyframes pop{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
-  .thumb{aspect-ratio:16/10;background:#000;position:relative}
-  .thumb video{width:100%;height:100%;object-fit:cover;display:block}
-  .badge{position:absolute;right:8px;bottom:8px;font-family:var(--mono);font-size:11px;background:rgba(0,0,0,.7);padding:3px 7px;border-radius:3px}
-  .card .meta{padding:12px 14px 14px}
-  .card .no{font-family:var(--mono);font-size:11px;color:var(--accent);letter-spacing:.06em;margin-bottom:6px}
-  .card h3{margin:0 0 6px;font-size:16px;line-height:1.35;letter-spacing:-.01em}
-  .card .sub{display:flex;gap:8px;font-size:13px;color:var(--muted);align-items:center}
-  .tools{display:flex;gap:5px;flex-wrap:wrap;margin-top:10px}
-  .tool{font-family:var(--mono);font-size:11px;padding:2px 7px;border-radius:3px;border:1px solid var(--line2);color:#c9c8c4}
-  .empty{grid-column:1/-1;text-align:center;color:var(--muted);padding:90px 0;border:1px dashed var(--line);border-radius:var(--radius)}
-
-  /* modal */
-  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);display:none;align-items:center;justify-content:center;padding:20px;z-index:50}
-  .overlay.show{display:flex}
-  .modal{background:var(--panel);border:1px solid var(--line);border-radius:10px;width:100%;max-width:540px;max-height:92vh;overflow:auto}
-  .modal.wide{max-width:1140px}
-  .modal-head{display:flex;align-items:center;padding:16px 20px;border-bottom:1px solid var(--line)}
-  .modal-head h2{margin:0;font-size:17px}
-  .modal-head .mono{font-size:11px;color:var(--accent);letter-spacing:.1em;margin-right:10px}
-  .modal-body{padding:20px}
-  label{display:block;font-size:13px;color:var(--muted);margin:16px 0 6px}
-  label:first-child{margin-top:0}
-  label .mono{color:var(--accent);font-size:11px;margin-right:6px}
-  input[type=text],textarea{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:var(--radius);padding:11px 12px;outline:none}
-  input[type=text]:focus,textarea:focus{border-color:var(--accent)}
-  textarea{resize:vertical;min-height:84px;line-height:1.55}
-  .drop{border:1.5px dashed var(--line2);border-radius:var(--radius);padding:22px;text-align:center;color:var(--muted);cursor:pointer;background:var(--panel2)}
-  .drop.has{border-style:solid;border-color:var(--accent);color:var(--text)}
-  .drop video{max-width:100%;max-height:200px;border-radius:4px;margin-top:10px}
-  .hint{font-size:12px;color:var(--muted);margin-top:6px}
-  .err{color:var(--danger);font-size:13px;margin-top:10px;min-height:1em}
-  .actions{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}
-
-  .detail{display:grid;grid-template-columns:1.45fr 1fr;min-height:560px}
-  .detail .left{background:#000;display:flex;align-items:center;justify-content:center}
-  .detail .left video{width:100%;max-height:82vh;display:block}
-  .detail .right{display:flex;flex-direction:column;border-left:1px solid var(--line);min-height:0;max-height:88vh}
-  .detail .info{padding:18px 20px;border-bottom:1px solid var(--line);overflow:auto}
-  .detail .info .no{font-family:var(--mono);font-size:11px;color:var(--accent);letter-spacing:.08em;margin-bottom:6px}
-  .detail .info h2{margin:0 0 6px;font-size:21px;letter-spacing:-.02em}
-  .sec{margin-top:18px}
-  .sec h4{margin:0 0 8px;font-family:var(--mono);font-size:11px;color:var(--muted);font-weight:500;letter-spacing:.12em}
-  .sec pre{margin:0;white-space:pre-wrap;word-break:break-word;font-family:var(--mono);font-size:12.5px;line-height:1.65;background:var(--panel2);border:1px solid var(--line);border-left:2px solid var(--accent);border-radius:4px;padding:10px 12px}
-  .sec .text{white-space:pre-wrap;font-size:14px;line-height:1.7}
-  .chead{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.12em;padding:14px 20px 0}
-  .comments{flex:1;overflow:auto;padding:6px 20px 14px;min-height:160px}
-  .cmt{padding:10px 0;border-bottom:1px solid rgba(255,255,255,.05)}
-  .cmt .who{font-size:13px;font-weight:700}
-  .cmt .who small{font-weight:400;color:var(--muted);margin-left:6px}
-  .cmt .body{font-size:14px;margin-top:3px;white-space:pre-wrap;word-break:break-word;line-height:1.55}
-  .cmt .del{float:right}
-  /* 삭제 */
-  .delbtn{position:absolute;right:8px;top:8px;height:28px;min-width:28px;padding:0 8px;border-radius:4px;border:1px solid rgba(255,255,255,.14);
-    background:rgba(0,0,0,.62);color:#ddd;display:flex;align-items:center;justify-content:center;gap:6px;font-size:12px;font-weight:600;
-    opacity:0;transform:translateY(-2px);transition:opacity .18s ease,transform .18s ease,background .18s ease}
-  .card:hover .delbtn,.delbtn.armed{opacity:1;transform:none}
-  .delbtn:hover{background:rgba(0,0,0,.8);color:#fff}
-  .delbtn.armed{background:var(--danger);border-color:var(--danger);color:#1a0606}
-  .delbtn svg{width:14px;height:14px}
-  .btn.danger{border-color:rgba(255,107,107,.45);color:var(--danger);background:transparent;padding:6px 11px;font-size:13px}
-  .btn.danger:hover{background:rgba(255,107,107,.1)}
-  .btn.danger.armed{background:var(--danger);color:#1a0606;border-color:var(--danger)}
-  .teacher{font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;color:var(--accent);border:1px solid var(--accent);border-radius:3px;padding:2px 6px}
-  @media (hover:none){ .delbtn{opacity:1;transform:none} }
-  .cform{display:flex;gap:8px;padding:12px 16px;border-top:1px solid var(--line)}
-  .cform input{flex:1}
-  .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);background:#1f2023;border:1px solid var(--line2);padding:10px 16px;border-radius:6px;font-size:14px;opacity:0;transition:.25s;z-index:100;pointer-events:none}
-  .toast.show{opacity:1;transform:translateX(-50%)}
-  .progress{height:4px;background:var(--panel2);border-radius:2px;overflow:hidden;margin-top:12px;display:none}
-  .progress div{height:100%;width:0;background:var(--accent);transition:width .2s}
-
-  .pagedrop{position:fixed;inset:0;z-index:80;display:flex;align-items:center;justify-content:center;
-    background:rgba(13,14,15,.84);backdrop-filter:blur(6px);opacity:0;pointer-events:none;transition:opacity .2s ease}
-  .pagedrop.show{opacity:1}
-  .pagedrop .box{border:2px dashed var(--accent);border-radius:12px;padding:56px 80px;text-align:center;
-    transform:scale(.97);transition:transform .25s ease}
-  .pagedrop.show .box{transform:none}
-  .pagedrop .mono{display:block;font-size:12px;letter-spacing:.14em;color:var(--accent);margin-bottom:12px}
-  .pagedrop b{display:block;font-size:24px;margin-bottom:6px}
-  .pagedrop span{color:var(--muted)}
-
-  @media (max-width:980px){
-    .hero{grid-template-columns:1fr}
-    .logo small{display:none}
+  @media (max-width:900px){
+    .intro{grid-template-columns:1fr;gap:24px;padding:44px 0 28px}
+    .detail{grid-template-columns:1fr;height:auto;max-height:90vh;overflow:auto}
+    .detail .left video{max-height:50vh}
+    .detail .info{max-height:none}
+    .modal.wide{overflow:auto}
   }
-  @media (max-width:820px){
+  @media (max-width:640px){
     .wrap{padding:0 16px}
-    .detail{grid-template-columns:1fr}
-    .detail .right{border-left:0;border-top:1px solid var(--line);max-height:none}
-    .hero{padding:32px 0 20px}
-    .hero h1{font-size:27px}
-    .stat{padding:10px 14px;min-width:0;flex:1}
-    .stat b{font-size:22px}
-    .me,.live span{display:none}
-    .people .count{display:none}
-    #renameBtn{display:none}
+    header .wrap{gap:12px}
+    .brand span,.me,.linkbtn,.count{display:none}
+    .bar{flex-direction:column;gap:8px}
+    .grid{gap:32px}
+  }
+  @media (prefers-reduced-motion:reduce){
+    *{transition-duration:.01ms !important;animation:none !important}
   }
 </style>
 </head>
 <body>
-<header>
+<header id="top">
   <div class="wrap">
-    <div class="logo"><span class="mark"></span><b>KHU ID × AI</b><small>PRODUCT FILM STUDIO</small></div>
-    <div class="live" id="live"><i></i><span>연결 중</span></div>
+    <div class="brand">산업디자인 × AI<span>제품 영상 크리틱</span></div>
     <div class="spacer"></div>
-    <div class="people" id="people"><div class="avatars" id="avatars"></div><span class="count" id="pcount"></span><div class="plist" id="plist"></div></div>
+    <div class="people" id="people"><span class="live" id="live"><span>연결 중</span></span><div class="avatars" id="avatars"></div><span class="count" id="pcount"></span><div class="plist" id="plist"></div></div>
     <div class="me" id="me"></div>
-    <button class="btn ghost" id="renameBtn">이름 변경</button>
-    <button class="btn primary" id="uploadBtn">+ 작품 올리기</button>
+    <button class="linkbtn" id="renameBtn">이름 바꾸기</button>
+    <button class="btn primary" id="uploadBtn">작품 올리기</button>
   </div>
 </header>
 
 <main class="wrap">
-  <section class="hero">
-    <div>
-      <div class="eyebrow">KYUNG HEE UNIV. · INDUSTRIAL DESIGN · AI WORKSHOP</div>
-      <h1>AI로 만든 제품 영상,<br><em>과정</em>까지 함께 봅니다</h1>
-      <p>생성형 AI로 제작한 제품 영상을 올리고 프롬프트와 디자인 프로세스를 함께 기록하세요. 서로의 작업에 크리틱을 남기면 실시간으로 공유됩니다. 영상 파일을 화면 어디에나 끌어다 놓으면 바로 올릴 수 있어요.</p>
-    </div>
-    <div class="stats">
-      <div class="stat"><small>WORKS</small><b id="sWorks">0</b></div>
-      <div class="stat"><small>DESIGNERS</small><b id="sDesigners">0</b></div>
-      <div class="stat"><small>CRITIQUES</small><b id="sCrits">0</b></div>
+  <section class="intro">
+    <h1>AI 제품 영상<br>크리틱</h1>
+    <div class="side">
+      <div class="course">경희대학교 산업디자인학과<span>AI 디자인 수업 · 2026. 11. 26.</span></div>
+      <p>오늘 만든 제품 영상을 올리고, 어떤 도구와 프롬프트로 만들었는지 같이 적어 주세요. 다른 사람 작품에는 크리틱을 남겨 주세요. 영상 파일은 화면에 바로 끌어다 놓아도 됩니다.</p>
     </div>
   </section>
-  <div class="toolbar"><span class="lbl">FILTER</span><div class="filters" id="filters"></div></div>
+  <div class="bar"><div class="filters" id="filters"></div><div class="totals" id="totals"></div></div>
   <section class="grid" id="grid"><div class="empty">불러오는 중…</div></section>
 </main>
 
 <!-- 이름 -->
 <div class="overlay" id="nickModal">
   <div class="modal">
-    <div class="modal-head"><span class="mono">WELCOME</span><h2>스튜디오에 들어가기</h2></div>
+    <div class="modal-head"><h2>이름을 알려 주세요</h2></div>
     <div class="modal-body">
-      <label for="nickInput">이름 (작품과 크리틱에 표시돼요)</label>
-      <input type="text" id="nickInput" maxlength="20" placeholder="예: 김경희">
+      <p class="lead">작품과 크리틱 옆에 이 이름이 붙습니다.</p>
+      <label for="nickInput">이름</label>
+      <input type="text" id="nickInput" maxlength="20" placeholder="김경희">
       <div class="err" id="nickErr"></div>
-      <div class="actions"><button class="btn primary" id="nickSave">입장하기</button></div>
+      <div class="actions"><button class="btn primary" id="nickSave">들어가기</button></div>
     </div>
   </div>
 </div>
@@ -238,21 +236,21 @@
 <!-- 업로드 -->
 <div class="overlay" id="upModal">
   <div class="modal">
-    <div class="modal-head"><span class="mono">SUBMIT</span><h2>작품 올리기</h2><div class="spacer"></div><button class="btn ghost" data-close>✕</button></div>
+    <div class="modal-head"><h2>작품 올리기</h2><div class="spacer"></div><button class="x" data-close aria-label="닫기">✕</button></div>
     <div class="modal-body">
-      <label><span class="mono">01</span>제품 영상 (최대 50MB)</label>
-      <div class="drop" id="drop">여기를 눌러 영상을 고르거나 끌어다 놓으세요<input type="file" id="file" accept="video/*" hidden></div>
-      <label for="fTitle"><span class="mono">02</span>작품명</label>
-      <input type="text" id="fTitle" maxlength="60" placeholder="예: FOLD — 접이식 캠핑 랜턴">
-      <label for="fTools"><span class="mono">03</span>사용한 AI 도구 (쉼표로 구분)</label>
-      <input type="text" id="fTools" maxlength="120" placeholder="예: Midjourney, Higgsfield, Runway">
-      <label for="fPrompt"><span class="mono">04</span>프롬프트</label>
-      <textarea id="fPrompt" placeholder="AI에 입력한 프롬프트를 그대로 붙여넣어 주세요"></textarea>
-      <label for="fHow"><span class="mono">05</span>디자인 프로세스</label>
-      <textarea id="fHow" placeholder="1. 스케치로 형태 방향 정리&#10;2. 이미지 AI로 CMF(색상·소재·마감) 시안 탐색&#10;3. 영상 AI로 제품 연출 컷 생성&#10;4. 편집과 사운드로 마무리"></textarea>
+      <label>영상<small>50MB까지</small></label>
+      <div class="drop" id="drop">눌러서 고르거나 여기로 끌어다 놓으세요<input type="file" id="file" accept="video/*" hidden></div>
+      <label for="fTitle">제목</label>
+      <input type="text" id="fTitle" maxlength="60" placeholder="FOLD 접이식 캠핑 랜턴">
+      <label for="fTools">사용한 도구<small>쉼표로 나눠 주세요</small></label>
+      <input type="text" id="fTools" maxlength="120" placeholder="Midjourney, Runway">
+      <label for="fPrompt">프롬프트</label>
+      <textarea id="fPrompt" placeholder="입력했던 프롬프트를 그대로 붙여 넣어 주세요"></textarea>
+      <label for="fHow">만든 과정</label>
+      <textarea id="fHow" placeholder="스케치로 형태를 정하고, 이미지 AI로 색과 소재를 바꿔 본 뒤 영상으로 만들었어요"></textarea>
       <div class="progress" id="prog"><div></div></div>
       <div class="err" id="upErr"></div>
-      <div class="actions"><button class="btn" data-close>취소</button><button class="btn primary" id="upSubmit">올리기</button></div>
+      <div class="actions"><button class="btn line" data-close>취소</button><button class="btn primary" id="upSubmit">올리기</button></div>
     </div>
   </div>
 </div>
@@ -263,19 +261,20 @@
     <div class="detail">
       <div class="left"><video id="dVideo" controls playsinline loop></video></div>
       <div class="right">
+        <button class="x" id="dClose" aria-label="닫기">✕</button>
         <div class="info" id="dInfo"></div>
-        <div class="chead">CRITIQUE</div>
+        <div class="chead">크리틱<span id="dCount"></span></div>
         <div class="comments" id="dComments"></div>
         <form class="cform" id="cForm">
-          <input type="text" id="cInput" maxlength="300" placeholder="형태, CMF, 연출에 대한 크리틱을 남겨 주세요" autocomplete="off">
-          <button class="btn primary" type="submit">등록</button>
+          <input type="text" id="cInput" maxlength="300" placeholder="형태, 소재, 연출에 대해 한마디" autocomplete="off">
+          <button class="btn primary" type="submit">남기기</button>
         </form>
       </div>
     </div>
   </div>
 </div>
 
-<div class="pagedrop" id="pagedrop"><div class="box"><span class="mono">DROP TO SUBMIT</span><b>여기에 놓아서 작품 올리기</b><span>제품 영상 · 최대 50MB</span></div></div>
+<div class="pagedrop" id="pagedrop"><div><b>여기에 놓으세요</b><span>영상 파일, 50MB까지</span></div></div>
 
 <div id="cursors"></div>
 <div class="toast" id="toast"></div>
@@ -300,7 +299,6 @@ if(!me.id){ me.id = (crypto.randomUUID ? crypto.randomUUID() : String(Math.rando
   if(q!==null) history.replaceState(null,"",location.pathname); })();
 const isTeacher = store("cvs_teacher")==="1";
 const canDelete = x => isTeacher || x.author_id===me.id;
-const TRASH = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6"/></svg>`;
 
 // 두 번 눌러 확인하는 버튼: 첫 클릭에 '삭제?'로 바뀌고 3초 안에 다시 누르면 실행
 function armOrRun(btn, armedLabel, run){
@@ -317,7 +315,7 @@ async function deletePost(p){
   await sb.storage.from("videos").remove([p.video_path]);
   posts = posts.filter(x=>x.id!==p.id); render();
   if(openPost?.id===p.id) closeDetail();
-  toast("작품을 삭제했어요");
+  toast("삭제했습니다");
 }
 
 let posts = [];
@@ -335,14 +333,16 @@ function show(id){ $(id).classList.add("show"); }
 function hide(id){ $(id).classList.remove("show"); }
 document.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>b.closest(".overlay").classList.remove("show"));
 document.querySelectorAll(".overlay").forEach(o=>o.addEventListener("mousedown",e=>{ if(e.target===o && o.id!=="nickModal"){ o.classList.remove("show"); if(o.id==="detailModal") closeDetail(); } }));
+$("#dClose").onclick = ()=>closeDetail();
+window.addEventListener("scroll", ()=>$("#top").classList.toggle("scrolled", window.scrollY>4), { passive:true });
 document.addEventListener("keydown",e=>{ if(e.key==="Escape"){ if($("#detailModal").classList.contains("show")) closeDetail(); hide("#upModal"); } });
 
 /* 닉네임 */
-function renderMe(){ $("#me").innerHTML = (isTeacher?`<span class="teacher">TEACHER</span> `:"") + (me.nick ? `<b>${esc(me.nick)}</b>` : ""); }
+function renderMe(){ $("#me").innerHTML = (isTeacher?`<span class="admin">관리자</span>`:"") + (me.nick ? esc(me.nick) : ""); }
 function askNick(){ $("#nickInput").value = me.nick || ""; show("#nickModal"); setTimeout(()=>$("#nickInput").focus(),50); }
 $("#nickSave").onclick = () => {
   const v = $("#nickInput").value.trim();
-  if(!v){ $("#nickErr").textContent="닉네임을 입력해 주세요"; return; }
+  if(!v){ $("#nickErr").textContent="이름을 적어 주세요"; return; }
   me.nick = v; store("cvs_nick", v); hide("#nickModal"); renderMe(); trackMe();
   if(pendingFile){ const f = pendingFile; pendingFile = null; openUploadWith(f); }
 };
@@ -353,33 +353,35 @@ $("#renameBtn").onclick = askNick;
 function renderFilters(){
   const names = [...new Set(posts.map(p=>p.nickname))];
   const f = $("#filters");
-  f.innerHTML = `<button class="chip ${!filterNick?"active":""}" data-n="">전체 ${posts.length}</button>` +
-    names.map(n=>`<button class="chip ${filterNick===n?"active":""}" data-n="${esc(n)}">${esc(n)} ${posts.filter(p=>p.nickname===n).length}</button>`).join("");
+  f.innerHTML = `<button class="chip ${!filterNick?"active":""}" data-n="">전체<sup>${posts.length}</sup></button>` +
+    names.map(n=>`<button class="chip ${filterNick===n?"active":""}" data-n="${esc(n)}">${esc(n)}<sup>${posts.filter(p=>p.nickname===n).length}</sup></button>`).join("");
   f.querySelectorAll(".chip").forEach(c=>c.onclick=()=>{ filterNick = c.dataset.n || null; render(); });
 }
-const workNo = p => "WORK " + String(posts.length - posts.indexOf(p)).padStart(2,"0");
+const workNo = p => String(posts.length - posts.indexOf(p)).padStart(2,"0");
 function paintStats(){
-  $("#sWorks").textContent = posts.length;
-  $("#sDesigners").textContent = new Set(posts.map(p=>p.nickname)).size;
-  $("#sCrits").textContent = posts.reduce((n,p)=>n+(counts[p.id]||0),0);
+  const crits = posts.reduce((n,p)=>n+(counts[p.id]||0),0);
+  $("#totals").textContent = posts.length ? `작품 ${posts.length} · 크리틱 ${crits}` : "";
 }
+const critLabel = n => n ? `크리틱 ${n}` : "";
 function cardHTML(p){
   const tools = (p.tools||"").split(",").map(s=>s.trim()).filter(Boolean);
+  const n = counts[p.id]||0;
   return `<article class="card" data-id="${p.id}">
     <div class="thumb"><video src="${esc(p.video_url)}#t=0.5" muted playsinline preload="metadata"></video>
-      <div class="viewers" data-v="${p.id}"></div>
-      ${canDelete(p)?`<button class="delbtn" title="작품 삭제" aria-label="작품 삭제">${TRASH}</button>`:""}
-      <span class="badge">CRIT ${counts[p.id]||0}</span></div>
-    <div class="meta"><div class="no">${workNo(p)}</div><h3>${esc(p.title)}</h3>
-      <div class="sub"><span>${esc(p.nickname)}</span><span>·</span><span>${ago(p.created_at)}</span></div>
-      ${tools.length?`<div class="tools">${tools.map(t=>`<span class="tool">${esc(t)}</span>`).join("")}</div>`:""}
+      <div class="viewers" data-v="${p.id}"></div></div>
+    <div class="cap">
+      <span class="no">${workNo(p)}</span>
+      <h3>${esc(p.title)}</h3>
+      ${canDelete(p)?`<button class="del">삭제</button>`:"<span></span>"}
+      <div class="by">${esc(p.nickname)} <i>· ${ago(p.created_at)}<span class="badge">${n?` · ${critLabel(n)}`:""}</span></i></div>
+      ${tools.length?`<div class="tl">${tools.map(esc).join(", ")}</div>`:""}
     </div></article>`;
 }
 function render(newId){
   renderFilters(); paintStats();
   const list = filterNick ? posts.filter(p=>p.nickname===filterNick) : posts;
   const g = $("#grid");
-  if(!list.length){ g.innerHTML = `<div class="empty">아직 올라온 작품이 없어요.<br>첫 번째 제품 영상을 올려 보세요.</div>`; return; }
+  if(!list.length){ g.innerHTML = filterNick ? `<div class="empty">이 사람이 올린 작품이 없습니다.</div>` : `<div class="empty">아직 올라온 작품이 없습니다.</div>`; return; }
   g.innerHTML = list.map(cardHTML).join("");
   g.querySelectorAll(".card").forEach(c=>{
     if(c.dataset.id===newId) c.classList.add("new");
@@ -387,8 +389,8 @@ function render(newId){
     c.onmouseenter = ()=>{ v.play().catch(()=>{}); };
     c.onmouseleave = ()=>{ v.pause(); };
     c.onclick = ()=>openDetail(c.dataset.id);
-    const d = c.querySelector(".delbtn");
-    if(d) d.onclick = e=>{ e.stopPropagation(); const p = posts.find(x=>x.id===c.dataset.id); if(p) armOrRun(d, `${TRASH}삭제?`, ()=>deletePost(p)); };
+    const d = c.querySelector(".del");
+    if(d) d.onclick = e=>{ e.stopPropagation(); const p = posts.find(x=>x.id===c.dataset.id); if(p) armOrRun(d, "정말 삭제", ()=>deletePost(p)); };
   });
   paintViewers();
 }
@@ -435,16 +437,16 @@ function pick(f){
   $("#upErr").textContent = "";
   if(!f) return;
   if(!f.type.startsWith("video/")){ $("#upErr").textContent="영상 파일만 올릴 수 있어요"; return; }
-  if(f.size > MAX_BYTES){ $("#upErr").textContent=`용량이 커요 (${(f.size/1048576).toFixed(1)}MB). 50MB 이하로 줄여서 올려 주세요. 1080p로 내보내면 대부분 해결돼요.`; return; }
+  if(f.size > MAX_BYTES){ $("#upErr").textContent=`${(f.size/1048576).toFixed(1)}MB라서 올릴 수 없어요. 1080p로 다시 내보내면 대개 50MB 아래로 줄어듭니다.`; return; }
   pickedFile = f;
   drop.classList.add("has");
-  drop.innerHTML = `<b>${esc(f.name)}</b> · ${(f.size/1048576).toFixed(1)}MB<br><video src="${URL.createObjectURL(f)}" muted autoplay loop playsinline></video><div class="hint">다른 파일을 고르려면 다시 누르세요</div>`;
+  drop.innerHTML = `<b>${esc(f.name)}</b> · ${(f.size/1048576).toFixed(1)}MB<br><video src="${URL.createObjectURL(f)}" muted autoplay loop playsinline></video><div class="hint">다른 파일로 바꾸려면 한 번 더 누르세요</div>`;
   drop.appendChild(fileIn);
   if(!$("#fTitle").value) $("#fTitle").value = f.name.replace(/\.[^.]+$/,"");
 }
 function resetUpload(){
   pickedFile=null; fileIn.value=""; drop.classList.remove("has");
-  drop.innerHTML="여기를 눌러 영상을 고르거나 끌어다 놓으세요"; drop.appendChild(fileIn);
+  drop.innerHTML="눌러서 고르거나 여기로 끌어다 놓으세요"; drop.appendChild(fileIn);
   ["#fTitle","#fTools","#fPrompt","#fHow"].forEach(s=>$(s).value="");
   $("#upErr").textContent=""; $("#prog").style.display="none"; $("#prog div").style.width="0";
 }
@@ -482,7 +484,7 @@ $("#upSubmit").onclick = async ()=>{
       video_path: path, video_url: publicUrl
     });
     if(error) throw error;
-    hide("#upModal"); resetUpload(); toast("작품이 올라갔어요");
+    hide("#upModal"); resetUpload(); toast("올렸습니다");
   }catch(e){
     $("#upErr").textContent = "업로드 실패: " + e.message;
   }finally{ btn.disabled=false; btn.textContent="올리기"; }
@@ -498,16 +500,16 @@ async function openDetail(id){
   $("#dInfo").innerHTML = `
     <div class="no">${workNo(p)}</div>
     <h2>${esc(p.title)}</h2>
-    <div class="sub" style="display:flex;gap:8px;color:var(--muted);font-size:13px;align-items:center">
-      <span>${esc(p.nickname)}</span><span>·</span><span>${ago(p.created_at)}</span>
-      ${canDelete(p)?`<span style="flex:1"></span><button class="btn danger" id="delPost">작품 삭제</button>`:""}
-    </div>
-    ${tools.length?`<div class="sec"><h4>AI TOOLS</h4><div class="tools" style="margin:0">${tools.map(t=>`<span class="tool">${esc(t)}</span>`).join("")}</div></div>`:""}
-    ${p.prompt?`<div class="sec"><h4>PROMPT</h4><pre>${esc(p.prompt)}</pre></div>`:""}
-    ${p.how_made?`<div class="sec"><h4>DESIGN PROCESS</h4><div class="text">${esc(p.how_made)}</div></div>`:""}`;
+    <div class="by"><span>${esc(p.nickname)} <i>· ${ago(p.created_at)}</i></span>
+      ${canDelete(p)?`<button class="del" id="delPost" style="margin-left:auto">삭제</button>`:""}</div>
+    ${tools.length?`<div class="sec"><h4>사용한 도구</h4><div class="text">${tools.map(esc).join(", ")}</div></div>`:""}
+    ${p.prompt?`<div class="sec"><h4>프롬프트</h4><pre>${esc(p.prompt)}</pre></div>`:""}
+    ${p.how_made?`<div class="sec"><h4>만든 과정</h4><div class="text">${esc(p.how_made)}</div></div>`:""}
+    ${!tools.length && !p.prompt && !p.how_made ? `<div class="sec"><div class="text" style="color:var(--muted)">만든 과정은 적혀 있지 않습니다.</div></div>`:""}`;
   const del = $("#delPost");
   if(del) del.onclick = ()=>armOrRun(del, "한 번 더 누르면 삭제", ()=>deletePost(p));
-  $("#dComments").innerHTML = `<div class="hint">크리틱 불러오는 중…</div>`;
+  $("#dCount").textContent = "";
+  $("#dComments").innerHTML = `<div class="hint">불러오는 중…</div>`;
   show("#detailModal");
   trackMe();
   const { data } = await sb.from("comments").select("*").eq("post_id", id).order("created_at");
@@ -518,10 +520,10 @@ let curComments = [];
 function renderComments(list){
   curComments = list;
   const box = $("#dComments");
-  if(!list.length){ box.innerHTML = `<div class="hint">아직 크리틱이 없어요. 첫 의견을 남겨 주세요.</div>`; return; }
+  $("#dCount").textContent = list.length || "";
+  if(!list.length){ box.innerHTML = `<div class="hint" style="padding-top:8px">아직 없습니다.</div>`; return; }
   box.innerHTML = list.map(c=>`<div class="cmt">
-      ${canDelete(c)?`<button class="btn ghost del" data-id="${c.id}">삭제</button>`:""}
-      <div class="who">${esc(c.nickname)}<small>${ago(c.created_at)}</small></div>
+      <div class="who">${esc(c.nickname)}<small>${ago(c.created_at)}</small>${canDelete(c)?`<button class="del" data-id="${c.id}">삭제</button>`:""}</div>
       <div class="body">${esc(c.body)}</div></div>`).join("");
   box.querySelectorAll(".del").forEach(b=>b.onclick=()=>sb.from("comments").delete().eq("id",b.dataset.id));
   box.scrollTop = box.scrollHeight;
@@ -533,7 +535,7 @@ $("#cForm").onsubmit = async e=>{
   const body = $("#cInput").value.trim(); if(!body || !openPost) return;
   $("#cInput").value = "";
   const { error } = await sb.from("comments").insert({ post_id: openPost.id, author_id: me.id, nickname: me.nick, body });
-  if(error){ toast("크리틱 등록 실패: "+error.message); $("#cInput").value = body; }
+  if(error){ toast("남기지 못했어요: "+error.message); $("#cInput").value = body; }
 };
 
 /* 실시간 */
@@ -541,7 +543,7 @@ sb.channel("class-room")
   .on("postgres_changes",{event:"INSERT",schema:"public",table:"posts"},({new:p})=>{
     if(posts.some(x=>x.id===p.id)) return;
     posts.unshift(p); render(p.id);
-    if(p.author_id!==me.id) toast(`${p.nickname} 님이 새 작품을 올렸어요`);
+    if(p.author_id!==me.id) toast(`${p.nickname} 님이 작품을 올렸습니다`);
   })
   .on("postgres_changes",{event:"DELETE",schema:"public",table:"posts"},({old})=>{
     posts = posts.filter(x=>x.id!==old.id); render();
@@ -558,13 +560,13 @@ sb.channel("class-room")
   .subscribe(status=>{
     const on = status==="SUBSCRIBED";
     $("#live").classList.toggle("on", on);
-    $("#live span").textContent = on ? "실시간 연결됨" : "연결 중";
+    $("#live span").textContent = on ? "실시간 연결됨" : "연결 중"; $("#live").title = on ? "실시간 연결됨" : "연결 중";
   });
-function updateBadge(pid){ const b=document.querySelector(`.card[data-id="${pid}"] .badge`); if(b) b.textContent=`CRIT ${counts[pid]||0}`; paintStats(); }
+function updateBadge(pid){ const b=document.querySelector(`.card[data-id="${pid}"] .badge`); if(b) b.textContent = counts[pid] ? ` · ${critLabel(counts[pid])}` : ""; paintStats(); }
 setInterval(()=>document.querySelectorAll(".card").length && render(), 60000);
 
 /* 접속자 + 실시간 커서 (Supabase Realtime Presence / Broadcast) */
-const PALETTE = ["#ff8a80","#ffb74d","#ffd54f","#aed581","#4dd0e1","#64b5f6","#9fa8da","#ce93d8","#f48fb1","#80cbc4","#bcaaa4","#90caf9"];
+const PALETTE = ["#f2a48f","#f0c27b","#e6d96b","#a9cf8a","#86cfc4","#8fb8e8","#b2a7e6","#e1a6cf","#d9b99b","#9fd0e6"];
 function colorOf(id){ let h=0; for(const ch of id) h=(h*31+ch.charCodeAt(0))>>>0; return PALETTE[h%PALETTE.length]; }
 me.color = colorOf(me.id);
 const initial = n => [...(n||"?").trim()][0] || "?";
@@ -588,9 +590,9 @@ function paintPeople(){
   $("#avatars").innerHTML =
     (people.length>MAX ? `<div class="av more">+${people.length-MAX}</div>` : "") +
     shown.slice().reverse().map(p=>`<div class="av ${p.id===me.id?"self":""}" style="background:${p.color}" title="${esc(p.nick)}">${esc(initial(p.nick))}</div>`).join("");
-  $("#pcount").textContent = people.length ? `스튜디오에 ${people.length}명` : "";
+  $("#pcount").textContent = people.length ? `${people.length}명 보는 중` : "";
   $("#plist").innerHTML = people.map(p=>`<div class="prow"><span class="dot" style="background:${p.color}"></span>
-      <div><b>${esc(p.nick)}</b>${p.id===me.id?" (나)":""}<small>${p.viewing?`‘${esc(p.viewingTitle||"")}’ 감상 중`:"작품 둘러보는 중"}</small></div></div>`).join("");
+      <div><b>${esc(p.nick)}</b>${p.id===me.id?" (나)":""}<small>${p.viewing?`‘${esc(p.viewingTitle||"")}’ 보는 중`:"목록 보는 중"}</small></div></div>`).join("");
   paintViewers();
 }
 function paintViewers(){
@@ -608,7 +610,7 @@ function moveCursor(d){
   let c = cursors[d.id];
   if(!c){
     c = document.createElement("div"); c.className = "cursor";
-    c.innerHTML = `<svg width="18" height="22" viewBox="0 0 18 22"><path d="M1 1l15 9.5-6.6 1.6L6.2 20z" fill="${p.color}" stroke="#0b0c10" stroke-width="1.4" stroke-linejoin="round"/></svg><div class="tag" style="background:${p.color}"></div>`;
+    c.innerHTML = `<svg width="18" height="22" viewBox="0 0 18 22"><path d="M1 1l15 9.5-6.6 1.6L6.2 20z" fill="${p.color}" stroke="#151515" stroke-width="1.3" stroke-linejoin="round"/></svg><div class="tag" style="background:${p.color}"></div>`;
     c.style.transform = `translate(${wrapLeft()+d.x}px,${d.y}px)`;
     cursorLayer.appendChild(c); cursors[d.id] = { el:c };
     c = cursors[d.id];
