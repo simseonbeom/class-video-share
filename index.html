@@ -101,6 +101,16 @@
   .progress{height:6px;background:var(--panel2);border-radius:99px;overflow:hidden;margin-top:12px;display:none}
   .progress div{height:100%;width:0;background:linear-gradient(90deg,var(--accent),var(--accent2));transition:width .2s}
 
+  .pagedrop{position:fixed;inset:0;z-index:80;display:flex;align-items:center;justify-content:center;
+    background:rgba(15,16,18,.82);backdrop-filter:blur(6px);opacity:0;pointer-events:none;transition:opacity .2s ease}
+  .pagedrop.show{opacity:1}
+  .pagedrop .box{border:2px dashed var(--accent);border-radius:24px;padding:56px 72px;text-align:center;
+    transform:scale(.97);transition:transform .25s ease}
+  .pagedrop.show .box{transform:none}
+  .pagedrop .big{font-size:44px;margin-bottom:10px}
+  .pagedrop b{display:block;font-size:22px;margin-bottom:6px}
+  .pagedrop span{color:var(--muted)}
+
   @media (max-width:820px){
     .detail{grid-template-columns:1fr}
     .detail .right{border-left:0;border-top:1px solid var(--line);max-height:none}
@@ -124,7 +134,7 @@
 <main class="wrap">
   <section class="hero">
     <h1>오늘 만든 영상을 올리고 서로 구경해요</h1>
-    <p>어떻게 만들었는지 함께 적어 주면 친구들이 따라 해볼 수 있어요. 새 글과 댓글은 실시간으로 올라옵니다.</p>
+    <p>어떻게 만들었는지 함께 적어 주면 친구들이 따라 해볼 수 있어요. 새 글과 댓글은 실시간으로 올라옵니다.<br>영상 파일을 이 화면 아무 데나 끌어다 놓으면 바로 올릴 수 있어요.</p>
     <div class="filters" id="filters"></div>
   </section>
   <section class="grid" id="grid"><div class="empty">불러오는 중…</div></section>
@@ -182,6 +192,8 @@
   </div>
 </div>
 
+<div class="pagedrop" id="pagedrop"><div class="box"><div class="big">🎬</div><b>여기에 놓아서 영상 올리기</b><span>영상 파일 · 최대 50MB</span></div></div>
+
 <div class="toast" id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
@@ -222,6 +234,7 @@ $("#nickSave").onclick = () => {
   const v = $("#nickInput").value.trim();
   if(!v){ $("#nickErr").textContent="닉네임을 입력해 주세요"; return; }
   me.nick = v; store("cvs_nick", v); hide("#nickModal"); renderMe();
+  if(pendingFile){ const f = pendingFile; pendingFile = null; openUploadWith(f); }
 };
 $("#nickInput").addEventListener("keydown", e=>{ if(e.key==="Enter" && !e.isComposing) $("#nickSave").click(); });
 $("#renameBtn").onclick = askNick;
@@ -273,7 +286,29 @@ const drop = $("#drop"), fileIn = $("#file");
 drop.onclick = ()=>fileIn.click();
 drop.ondragover = e=>{ e.preventDefault(); drop.classList.add("has"); };
 drop.ondragleave = ()=>{ if(!pickedFile) drop.classList.remove("has"); };
-drop.ondrop = e=>{ e.preventDefault(); pick(e.dataTransfer.files[0]); };
+drop.ondrop = e=>{ e.preventDefault(); e.stopPropagation(); hidePageDrop(); pick(e.dataTransfer.files[0]); };
+
+/* 화면 어디에나 끌어다 놓기 */
+let dragDepth = 0, pendingFile = null;
+const pageDrop = $("#pagedrop");
+const hasFiles = e => [...(e.dataTransfer?.types||[])].includes("Files");
+function hidePageDrop(){ dragDepth = 0; pageDrop.classList.remove("show"); }
+window.addEventListener("dragenter", e=>{
+  if(!hasFiles(e)) return; e.preventDefault();
+  dragDepth++;
+  if(!$("#upModal").classList.contains("show")) pageDrop.classList.add("show");
+});
+window.addEventListener("dragover", e=>{ if(hasFiles(e)) e.preventDefault(); });
+window.addEventListener("dragleave", e=>{ if(!hasFiles(e)) return; dragDepth = Math.max(0, dragDepth-1); if(!dragDepth) hidePageDrop(); });
+window.addEventListener("drop", e=>{
+  if(!hasFiles(e)) return; e.preventDefault(); hidePageDrop();
+  const f = e.dataTransfer.files[0]; if(!f) return;
+  if(!f.type.startsWith("video/")) return toast("영상 파일만 올릴 수 있어요");
+  if($("#detailModal").classList.contains("show")) closeDetail();
+  if(!me.nick){ pendingFile = f; return askNick(); }
+  openUploadWith(f);
+});
+function openUploadWith(f){ show("#upModal"); pick(f); setTimeout(()=>$("#fTitle").focus(),50); }
 fileIn.onchange = ()=>pick(fileIn.files[0]);
 function pick(f){
   $("#upErr").textContent = "";
