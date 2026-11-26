@@ -285,10 +285,12 @@
 <div class="toast" id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mp4-muxer@5.2.2/build/mp4-muxer.min.js"></script>
 <script>
 const SUPABASE_URL = "https://xzejhtggfrwaazvmkokw.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh6ZWpodGdnZnJ3YWF6dm1rb2t3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTU2Nzc1NjYsImV4cCI6MjExMTI1MzU2Nn0.ipct6SMF-Wcph9nknjaFoot5CkVgQxJewGW7zIIsRDo";
-const MAX_BYTES = 50 * 1024 * 1024;
+const MAX_BYTES = 50 * 1024 * 1024;        // 저장소에 올라가는 파일 한 개 한도
+const MAX_INPUT = 400 * 1024 * 1024;       // 압축 전 원본으로 받아 줄 최대 크기
 
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const $ = s => document.querySelector(s);
@@ -440,16 +442,29 @@ function pick(f){
   $("#upErr").textContent = "";
   if(!f) return;
   if(!f.type.startsWith("video/")){ $("#upErr").textContent="영상 파일만 올릴 수 있어요"; return; }
-  if(f.size > MAX_BYTES){ $("#upErr").textContent=`${(f.size/1048576).toFixed(1)}MB라서 올릴 수 없어요. 1080p로 다시 내보내면 대개 50MB 아래로 줄어듭니다.`; return; }
+  const limit = canCompress ? MAX_INPUT : MAX_BYTES;
+  if(f.size > limit){ $("#upErr").textContent=`${mb(f.size)}라서 올릴 수 없어요. ${canCompress ? "더 짧게 잘라서" : "1080p로 다시 내보내서 50MB 아래로 줄인 뒤"}올려 주세요.`; return; }
+  if(compressJob) compressJob.cancel();
   pickedFile = f;
   thumbJob = makeThumb(f);
   drop.classList.add("has");
-  drop.innerHTML = `<b>${esc(f.name)}</b> · ${(f.size/1048576).toFixed(1)}MB<br><video src="${URL.createObjectURL(f)}" muted autoplay loop playsinline></video><div class="hint">다른 파일로 바꾸려면 한 번 더 누르세요</div>`;
+  drop.innerHTML = `<b>${esc(f.name)}</b> · ${mb(f.size)}<br><video src="${URL.createObjectURL(f)}" muted autoplay loop playsinline></video><div class="hint" id="cmpState">다른 파일로 바꾸려면 한 번 더 누르세요</div>`;
   drop.appendChild(fileIn);
+  // 고르자마자 뒤에서 압축을 시작해 두고, 올리기 버튼을 누르면 결과를 기다린다
+  let cancelled = false;
+  const state = t=>{ const el = document.getElementById("cmpState"); if(el && pickedFile===f) el.textContent = t; };
+  const promise = canCompress
+    ? (state("용량 줄이는 중… 0%"),
+       compressVideo(f, r=>state(`용량 줄이는 중… ${Math.round(r*100)}%`), ()=>cancelled)
+        .then(r=>{ state(r.to ? `${mb(r.from)} → ${mb(r.to)}로 줄였어요` : `원본 그대로 올립니다 (${mb(f.size)})`); return r; })
+        .catch(()=>({ file: f, reason: "cancelled" })))
+    : Promise.resolve({ file: f, reason: "unsupported" });
+  compressJob = { promise, cancel: ()=>{ cancelled = true; } };
   if(!$("#fTitle").value) $("#fTitle").value = f.name.replace(/\.[^.]+$/,"");
 }
 function resetUpload(){
-  pickedFile=null; thumbJob=null; fileIn.value=""; drop.classList.remove("has");
+  if(compressJob) compressJob.cancel();
+  pickedFile=null; thumbJob=null; compressJob=null; fileIn.value=""; drop.classList.remove("has");
   drop.innerHTML="눌러서 고르거나 여기로 끌어다 놓으세요"; drop.appendChild(fileIn);
   ["#fTitle","#fTools","#fPrompt","#fHow"].forEach(s=>$(s).value="");
   $("#upErr").textContent=""; $("#prog").style.display="none"; $("#prog div").style.width="0";
@@ -474,7 +489,124 @@ function makeThumb(file){
     setTimeout(()=>finish(null), 8000);
   });
 }
-let thumbJob = null;
+let thumbJob = null, compressJob = null;
+
+/* ── 업로드 전 압축 ──────────────────────────────────────────
+   학생 컴퓨터에서 영상을 긴 변 1280px(720p), 약 2Mbps H.264로 다시 인코딩한다.
+   영상은 숨긴 <video>로 재생하며 프레임을 받아 VideoEncoder로, 소리는 AudioEncoder(AAC)로.
+   지원하지 않는 브라우저이거나 중간에 문제가 생기면 원본을 그대로 쓴다. */
+const canCompress = typeof VideoEncoder !== "undefined" && typeof VideoFrame !== "undefined"
+  && "requestVideoFrameCallback" in HTMLVideoElement.prototype && typeof Mp4Muxer !== "undefined";
+const LONG_SIDE = 1280, V_BITRATE = 2_000_000, A_BITRATE = 128_000;
+
+async function pickVideoCodec(width, height){
+  for(const codec of ["avc1.4d0028","avc1.42e028","avc1.42001f"]){
+    const cfg = { codec, width, height, bitrate: V_BITRATE, framerate: 30, avc: { format: "avc" } };
+    try{ if((await VideoEncoder.isConfigSupported(cfg)).supported) return cfg; }catch(e){}
+  }
+  return null;
+}
+async function decodeAudio(file){
+  try{
+    const buf = await file.arrayBuffer();
+    const ctx = new OfflineAudioContext(2, 1, 48000);
+    const ab = await ctx.decodeAudioData(buf);
+    return ab.length ? ab : null;            // 소리가 없는 파일이면 여기서 실패 → null
+  }catch(e){ return null; }
+}
+async function compressVideo(file, onProgress, isCancelled){
+  if(!canCompress) return { file, reason: "unsupported" };
+  const url = URL.createObjectURL(file);
+  const v = document.createElement("video");
+  v.muted = true; v.playsInline = true; v.preload = "auto"; v.src = url;
+  v.style.cssText = "position:fixed;left:0;top:0;width:2px;height:2px;opacity:0;pointer-events:none";
+  document.body.appendChild(v);      // 문서에 붙어 있어야 프레임 콜백이 확실히 온다
+  let watchdog = null;
+  const cleanup = ()=>{ clearInterval(watchdog); v.pause(); v.removeAttribute("src"); v.load(); v.remove(); URL.revokeObjectURL(url); };
+  try{
+    await new Promise((res, rej)=>{ v.onloadedmetadata = res; v.onerror = ()=>rej(new Error("영상을 읽지 못했어요")); });
+    const vw = v.videoWidth, vh = v.videoHeight, dur = v.duration;
+    if(!vw || !vh || !isFinite(dur)) return { file, reason: "meta" };
+    const k = Math.min(1, LONG_SIDE / Math.max(vw, vh));
+    const width = Math.round(vw * k / 2) * 2, height = Math.round(vh * k / 2) * 2;
+
+    const vcfg = await pickVideoCodec(width, height);
+    if(!vcfg) return { file, reason: "codec" };
+
+    const audio = await decodeAudio(file);
+    let acfg = null;
+    if(audio){
+      const ch = Math.min(2, audio.numberOfChannels);
+      acfg = { codec: "mp4a.40.2", sampleRate: audio.sampleRate, numberOfChannels: ch, bitrate: A_BITRATE };
+      try{ if(!(await AudioEncoder.isConfigSupported(acfg)).supported) acfg = null; }catch(e){ acfg = null; }
+      if(!acfg) return { file, reason: "audio" };     // 소리가 있는데 못 넣으면 원본 유지
+    }
+
+    const target = new Mp4Muxer.ArrayBufferTarget();
+    const muxer = new Mp4Muxer.Muxer({
+      target, fastStart: "in-memory", firstTimestampBehavior: "offset",
+      video: { codec: "avc", width, height },
+      ...(acfg ? { audio: { codec: "aac", numberOfChannels: acfg.numberOfChannels, sampleRate: acfg.sampleRate } } : {})
+    });
+    let failed = null;
+    const venc = new VideoEncoder({ output: (c, m)=>{ try{ muxer.addVideoChunk(c, m); }catch(e){ failed = e; } }, error: e=>{ failed = e; } });
+    venc.configure(vcfg);
+
+    if(acfg){
+      const aenc = new AudioEncoder({ output: (c, m)=>{ try{ muxer.addAudioChunk(c, m); }catch(e){ failed = e; } }, error: e=>{ failed = e; } });
+      aenc.configure(acfg);
+      const ch = acfg.numberOfChannels, sr = audio.sampleRate, N = audio.length, STEP = 4096;
+      for(let i = 0; i < N; i += STEP){
+        const n = Math.min(STEP, N - i), data = new Float32Array(n * ch);
+        for(let c = 0; c < ch; c++) data.set(audio.getChannelData(c).subarray(i, i + n), c * n);
+        const ad = new AudioData({ format: "f32-planar", sampleRate: sr, numberOfFrames: n, numberOfChannels: ch, timestamp: Math.round(i / sr * 1e6), data });
+        aenc.encode(ad); ad.close();
+      }
+      await aenc.flush(); aenc.close();
+    }
+
+    const canvas = document.createElement("canvas"); canvas.width = width; canvas.height = height;
+    const g = canvas.getContext("2d");
+    let lastTs = -1, lastKey = -Infinity;
+    v.playbackRate = dur > 12 ? 2 : 1;      // 긴 영상만 빨리 감아 시간 절약
+    await new Promise((res, rej)=>{
+      let lastBeat = Date.now();
+      watchdog = setInterval(()=>{ if(Date.now() - lastBeat > 10000) rej(new Error("stalled")); }, 1000);   // 10초간 진행이 없으면 원본으로
+      const onFrame = (now, meta)=>{
+        lastBeat = Date.now();
+        if(isCancelled() || failed){ return rej(failed || new Error("cancelled")); }
+        const ts = Math.round(meta.mediaTime * 1e6);
+        if(ts > lastTs){
+          g.drawImage(v, 0, 0, width, height);
+          const frame = new VideoFrame(canvas, { timestamp: ts, duration: 33333 });   // 길이 값이 없으면 mp4로 못 묶음 (실제 간격은 muxer가 다음 프레임으로 보정)
+          const key = ts - lastKey >= 2e6;            // 2초마다 키프레임
+          if(key) lastKey = ts;
+          venc.encode(frame, { keyFrame: key }); frame.close();
+          lastTs = ts;
+          onProgress(Math.min(.99, meta.mediaTime / dur));
+        }
+        if(!v.ended) v.requestVideoFrameCallback(onFrame);
+      };
+      v.requestVideoFrameCallback(onFrame);
+      v.onended = res;
+      v.onerror = ()=>rej(new Error("재생 오류"));
+      v.play().catch(rej);
+    });
+    await venc.flush(); venc.close();
+    if(failed) throw failed;
+    if(lastTs < 0) return { file, reason: "noframes" };
+    muxer.finalize();
+    const out = new File([target.buffer], file.name.replace(/\.[^.]+$/, "") + ".mp4", { type: "video/mp4" });
+    onProgress(1);
+    if(out.size >= file.size * 0.9) return { file, reason: "notsmaller" };   // 이미 작은 영상은 원본 유지
+    return { file: out, from: file.size, to: out.size };
+  }catch(e){
+    if(isCancelled()) throw e;
+    console.warn("[compress]", e);
+    return { file, reason: "error" };
+  }finally{ cleanup(); }
+}
+const mb = n => (n/1048576).toFixed(1) + "MB";
 function uploadWithProgress(path, file, onProgress){
   // supabase-js 업로드는 진행률이 없어 XHR로 직접 올림
   return new Promise((resolve,reject)=>{
@@ -495,12 +627,18 @@ $("#upSubmit").onclick = async ()=>{
   const title = $("#fTitle").value.trim();
   if(!pickedFile){ $("#upErr").textContent="영상을 골라 주세요"; return; }
   if(!title){ $("#upErr").textContent="제목을 입력해 주세요"; return; }
-  const btn = $("#upSubmit"); btn.disabled = true; btn.textContent = "올리는 중…";
+  const btn = $("#upSubmit"); btn.disabled = true;
   $("#upErr").textContent=""; $("#prog").style.display="block";
   try{
-    const ext = (pickedFile.name.split(".").pop()||"mp4").toLowerCase().replace(/[^a-z0-9]/g,"") || "mp4";
+    btn.textContent = "용량 줄이는 중…";
+    const job = compressJob;
+    const result = job ? await job.promise : { file: pickedFile };
+    const upFile = result.file;
+    if(upFile.size > MAX_BYTES) throw new Error(`${mb(upFile.size)}라서 50MB 한도를 넘어요. 영상을 더 짧게 잘라 주세요.`);
+    btn.textContent = "올리는 중…";
+    const ext = (upFile.name.split(".").pop()||"mp4").toLowerCase().replace(/[^a-z0-9]/g,"") || "mp4";
     const path = `${Date.now()}-${Math.random().toString(36).slice(2,8)}.${ext}`;
-    await uploadWithProgress(path, pickedFile, r=>$("#prog div").style.width=(r*95).toFixed(0)+"%");
+    await uploadWithProgress(path, upFile, r=>$("#prog div").style.width=(r*95).toFixed(0)+"%");
     const { data:{ publicUrl } } = sb.storage.from("videos").getPublicUrl(path);
     let thumb_url = null;
     const thumb = thumbJob ? await thumbJob : null;
