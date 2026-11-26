@@ -26,6 +26,31 @@
   .live i{width:7px;height:7px;border-radius:50%;background:#555}
   .live.on i{background:#3ddc84;box-shadow:0 0 0 3px rgba(61,220,132,.18)}
   .spacer{flex:1}
+  /* 접속자(프레즌스) */
+  .people{display:flex;align-items:center;gap:10px;position:relative}
+  .avatars{display:flex;flex-direction:row-reverse}
+  .av{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:700;color:#0b0c10;
+    border:2px solid var(--bg);margin-left:-8px;position:relative;cursor:default;transition:transform .2s ease;animation:avIn .35s ease}
+  .av:hover{transform:translateY(-2px);z-index:2}
+  .av.more{background:var(--panel2);color:var(--muted);border-color:var(--bg)}
+  .av.self{box-shadow:0 0 0 2px var(--text) inset}
+  @keyframes avIn{from{opacity:0;transform:scale(.6)}to{opacity:1;transform:none}}
+  .people .count{font-size:13px;color:var(--muted);white-space:nowrap}
+  .plist{position:absolute;top:42px;right:0;min-width:230px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:8px;
+    box-shadow:0 12px 30px rgba(0,0,0,.4);opacity:0;pointer-events:none;transform:translateY(-4px);transition:.18s ease;z-index:20}
+  .people:hover .plist{opacity:1;pointer-events:auto;transform:none}
+  .prow{display:flex;align-items:center;gap:10px;padding:7px 8px;border-radius:8px;font-size:13.5px}
+  .prow .dot{width:10px;height:10px;border-radius:50%;flex:none}
+  .prow small{display:block;color:var(--muted);font-size:12px;margin-top:1px}
+  .viewers{position:absolute;left:8px;top:8px;display:flex}
+  .viewers .av{width:24px;height:24px;font-size:11px;margin-left:-6px;border-width:2px}
+  .viewers .av:first-child{margin-left:0}
+  /* 실시간 커서 */
+  #cursors{position:absolute;left:0;top:0;width:0;height:0;z-index:90;pointer-events:none}
+  .cursor{position:absolute;left:0;top:0;transition:transform .22s linear,opacity .3s ease;will-change:transform}
+  .cursor svg{display:block;filter:drop-shadow(0 1px 2px rgba(0,0,0,.5))}
+  .cursor .tag{position:absolute;left:14px;top:16px;padding:3px 8px;border-radius:8px 8px 8px 2px;font-size:12px;font-weight:700;color:#0b0c10;white-space:nowrap}
+  .cursor.idle{opacity:0}
   .me{font-size:14px;color:var(--muted)}
   .me b{color:var(--text)}
   .btn{border:0;border-radius:10px;padding:10px 16px;font-weight:600;background:var(--panel2);border:1px solid var(--line)}
@@ -116,6 +141,7 @@
     .detail .right{border-left:0;border-top:1px solid var(--line);max-height:none}
     .hero h1{font-size:22px}
     .me{display:none}
+    .people .count{display:none}
   }
 </style>
 </head>
@@ -125,6 +151,7 @@
     <div class="logo">🎬 <span>우리 반 영상 갤러리</span></div>
     <div class="live" id="live"><i></i><span>연결 중</span></div>
     <div class="spacer"></div>
+    <div class="people" id="people"><div class="avatars" id="avatars"></div><span class="count" id="pcount"></span><div class="plist" id="plist"></div></div>
     <div class="me" id="me"></div>
     <button class="btn ghost" id="renameBtn">닉네임 변경</button>
     <button class="btn primary" id="uploadBtn">+ 영상 올리기</button>
@@ -194,6 +221,7 @@
 
 <div class="pagedrop" id="pagedrop"><div class="box"><div class="big">🎬</div><b>여기에 놓아서 영상 올리기</b><span>영상 파일 · 최대 50MB</span></div></div>
 
+<div id="cursors"></div>
 <div class="toast" id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
@@ -233,7 +261,7 @@ function askNick(){ $("#nickInput").value = me.nick || ""; show("#nickModal"); s
 $("#nickSave").onclick = () => {
   const v = $("#nickInput").value.trim();
   if(!v){ $("#nickErr").textContent="닉네임을 입력해 주세요"; return; }
-  me.nick = v; store("cvs_nick", v); hide("#nickModal"); renderMe();
+  me.nick = v; store("cvs_nick", v); hide("#nickModal"); renderMe(); trackMe();
   if(pendingFile){ const f = pendingFile; pendingFile = null; openUploadWith(f); }
 };
 $("#nickInput").addEventListener("keydown", e=>{ if(e.key==="Enter" && !e.isComposing) $("#nickSave").click(); });
@@ -251,6 +279,7 @@ function cardHTML(p){
   const tools = (p.tools||"").split(",").map(s=>s.trim()).filter(Boolean);
   return `<article class="card" data-id="${p.id}">
     <div class="thumb"><video src="${esc(p.video_url)}#t=0.5" muted playsinline preload="metadata"></video>
+      <div class="viewers" data-v="${p.id}"></div>
       <span class="badge">💬 ${counts[p.id]||0}</span></div>
     <div class="meta"><h3>${esc(p.title)}</h3>
       <div class="sub"><span>${esc(p.nickname)}</span><span>·</span><span>${ago(p.created_at)}</span></div>
@@ -270,6 +299,7 @@ function render(newId){
     c.onmouseleave = ()=>{ v.pause(); };
     c.onclick = ()=>openDetail(c.dataset.id);
   });
+  paintViewers();
 }
 async function load(){
   const { data, error } = await sb.from("posts").select("*").order("created_at",{ascending:false});
@@ -393,6 +423,7 @@ async function openDetail(id){
   };
   $("#dComments").innerHTML = `<div class="hint">댓글 불러오는 중…</div>`;
   show("#detailModal");
+  trackMe();
   const { data } = await sb.from("comments").select("*").eq("post_id", id).order("created_at");
   if(openPost?.id!==id) return;
   renderComments(data||[]);
@@ -409,7 +440,7 @@ function renderComments(list){
   box.querySelectorAll(".del").forEach(b=>b.onclick=()=>sb.from("comments").delete().eq("id",b.dataset.id));
   box.scrollTop = box.scrollHeight;
 }
-function closeDetail(){ hide("#detailModal"); $("#dVideo").pause(); $("#dVideo").removeAttribute("src"); openPost=null; }
+function closeDetail(){ hide("#detailModal"); $("#dVideo").pause(); $("#dVideo").removeAttribute("src"); openPost=null; trackMe(); }
 $("#cForm").onsubmit = async e=>{
   e.preventDefault();
   if(!me.nick) return askNick();
@@ -445,6 +476,87 @@ sb.channel("class-room")
   });
 function updateBadge(pid){ const b=document.querySelector(`.card[data-id="${pid}"] .badge`); if(b) b.textContent=`💬 ${counts[pid]||0}`; }
 setInterval(()=>document.querySelectorAll(".card").length && render(), 60000);
+
+/* 접속자 + 실시간 커서 (Supabase Realtime Presence / Broadcast) */
+const PALETTE = ["#ff8a80","#ffb74d","#ffd54f","#aed581","#4dd0e1","#64b5f6","#9fa8da","#ce93d8","#f48fb1","#80cbc4","#bcaaa4","#90caf9"];
+function colorOf(id){ let h=0; for(const ch of id) h=(h*31+ch.charCodeAt(0))>>>0; return PALETTE[h%PALETTE.length]; }
+me.color = colorOf(me.id);
+const initial = n => [...(n||"?").trim()][0] || "?";
+let people = [];                       // [{id,nick,color,viewing,viewingTitle,at}]
+let roomReady = false;
+
+const room = sb.channel("class-room-presence", { config: { presence: { key: me.id }, broadcast: { self: false } } });
+function trackMe(){
+  if(!roomReady || !me.nick) return;
+  room.track({ id: me.id, nick: me.nick, color: me.color,
+    viewing: openPost?.id || null, viewingTitle: openPost?.title || null, at: Date.now() });
+}
+function readPeople(){
+  const st = room.presenceState(), out = [];
+  for(const key in st){ const m = st[key][st[key].length-1]; if(m && m.nick) out.push(m); }
+  out.sort((a,b)=> (a.id===me.id?-1:b.id===me.id?1:a.at-b.at));
+  return out;
+}
+function paintPeople(){
+  const MAX = 6, shown = people.slice(0, MAX);
+  $("#avatars").innerHTML =
+    (people.length>MAX ? `<div class="av more">+${people.length-MAX}</div>` : "") +
+    shown.slice().reverse().map(p=>`<div class="av ${p.id===me.id?"self":""}" style="background:${p.color}" title="${esc(p.nick)}">${esc(initial(p.nick))}</div>`).join("");
+  $("#pcount").textContent = people.length ? `${people.length}명 접속 중` : "";
+  $("#plist").innerHTML = people.map(p=>`<div class="prow"><span class="dot" style="background:${p.color}"></span>
+      <div><b>${esc(p.nick)}</b>${p.id===me.id?" (나)":""}<small>${p.viewing?`‘${esc(p.viewingTitle||"")}’ 보는 중`:"둘러보는 중"}</small></div></div>`).join("");
+  paintViewers();
+}
+function paintViewers(){
+  document.querySelectorAll(".viewers").forEach(box=>{
+    const vs = people.filter(p=>p.viewing===box.dataset.v);
+    box.innerHTML = vs.slice(0,4).map(p=>`<div class="av" style="background:${p.color}" title="${esc(p.nick)} 보는 중">${esc(initial(p.nick))}</div>`).join("");
+  });
+}
+
+// 커서: 가운데 정렬된 본문(.wrap) 기준 좌표로 주고받아 화면 폭이 달라도 같은 자리에 보이게
+const cursorLayer = $("#cursors"), cursors = {};
+const wrapLeft = () => document.querySelector("main.wrap").getBoundingClientRect().left + window.scrollX;
+function moveCursor(d){
+  const p = people.find(x=>x.id===d.id) || d;
+  let c = cursors[d.id];
+  if(!c){
+    c = document.createElement("div"); c.className = "cursor";
+    c.innerHTML = `<svg width="18" height="22" viewBox="0 0 18 22"><path d="M1 1l15 9.5-6.6 1.6L6.2 20z" fill="${p.color}" stroke="#0b0c10" stroke-width="1.4" stroke-linejoin="round"/></svg><div class="tag" style="background:${p.color}"></div>`;
+    c.style.transform = `translate(${wrapLeft()+d.x}px,${d.y}px)`;
+    cursorLayer.appendChild(c); cursors[d.id] = { el:c };
+    c = cursors[d.id];
+  }
+  c.el.querySelector(".tag").textContent = p.nick || d.nick || "";
+  c.el.classList.remove("idle");
+  c.el.style.transform = `translate(${wrapLeft()+d.x}px,${d.y}px)`;
+  clearTimeout(c.t); c.t = setTimeout(()=>c.el.classList.add("idle"), 5000);
+}
+function dropCursor(id){ const c=cursors[id]; if(c){ c.el.remove(); delete cursors[id]; } }
+
+let lastSend = 0, pendingMove = null, sendTimer = null;
+function sendMove(){
+  sendTimer = null; if(!pendingMove) return;
+  lastSend = Date.now();
+  room.send({ type:"broadcast", event:"cursor", payload: pendingMove });
+  pendingMove = null;
+}
+window.addEventListener("pointermove", e=>{
+  if(e.pointerType!=="mouse" || !roomReady || !me.nick) return;
+  pendingMove = { id: me.id, nick: me.nick, x: Math.round(e.pageX - wrapLeft()), y: Math.round(e.pageY) };
+  const wait = 200 - (Date.now()-lastSend);          // 1초에 최대 5번만 보내서 무료 한도 안에서 동작
+  if(wait<=0) sendMove(); else if(!sendTimer) sendTimer = setTimeout(sendMove, wait);
+});
+document.addEventListener("mouseleave", ()=>{ if(roomReady) room.send({ type:"broadcast", event:"cursor-leave", payload:{ id: me.id } }); });
+
+room
+  .on("presence", { event: "sync" }, ()=>{
+    people = readPeople(); paintPeople();
+    Object.keys(cursors).forEach(id=>{ if(!people.some(p=>p.id===id)) dropCursor(id); });
+  })
+  .on("broadcast", { event: "cursor" }, ({ payload })=> moveCursor(payload))
+  .on("broadcast", { event: "cursor-leave" }, ({ payload })=>{ const c=cursors[payload.id]; if(c) c.el.classList.add("idle"); })
+  .subscribe(status=>{ if(status==="SUBSCRIBED"){ roomReady = true; trackMe(); } });
 
 renderMe();
 if(!me.nick) askNick();
